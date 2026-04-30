@@ -7,8 +7,17 @@ import { supabase } from '@/lib/supabase'
 
 const ADMIN_EMAIL = 'harlene@example.com'
 
+const TIERS = [
+  { id: 'tier-1-policies', label: 'Tier 1 - Policies', icon: '📋' },
+  { id: 'tier-2-ims-manual', label: 'Tier 2 - IMS Manual, Plan, Document List', icon: '📘' },
+  { id: 'tier-3-procedures', label: 'Tier 3 - Procedures', icon: '📑' },
+  { id: 'tier-4-work-instructions', label: 'Tier 4 - Work Instructions, Flowcharts', icon: '📃' },
+  { id: 'tier-5-forms', label: 'Tier 5 - Forms', icon: '📝' },
+]
+
 export default function UploadPage() {
   const [file, setFile] = useState<File | null>(null)
+  const [selectedTier, setSelectedTier] = useState(TIERS[0].id)
   const [uploading, setUploading] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState('')
@@ -77,10 +86,13 @@ export default function UploadPage() {
 
     const timestamp = Date.now()
     const safeFileName = `${timestamp}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
+    
+    // Upload to the selected tier folder
+    const filePath = `${selectedTier}/${safeFileName}`
 
     const { error: uploadError } = await supabase.storage
       .from('documents')
-      .upload(safeFileName, file, {
+      .upload(filePath, file, {
         cacheControl: '3600',
         upsert: false,
       })
@@ -161,6 +173,29 @@ export default function UploadPage() {
 
         <div className="bg-white rounded-2xl shadow-2xl p-6 md:p-8">
           
+          {/* Tier Selection */}
+          <div className="mb-6">
+            <label htmlFor="tier-select" className="block text-sm font-semibold text-gray-700 mb-2">
+              📂 Document Tier
+            </label>
+            <select
+              id="tier-select"
+              value={selectedTier}
+              onChange={(e) => setSelectedTier(e.target.value)}
+              disabled={uploading}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition bg-white text-gray-900"
+            >
+              {TIERS.map((tier) => (
+                <option key={tier.id} value={tier.id}>
+                  {tier.icon} {tier.label}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-500 mt-1">
+              Choose the appropriate tier based on document type
+            </p>
+          </div>
+
           <label
             htmlFor="file-input"
             onDragEnter={handleDrag}
@@ -242,12 +277,13 @@ export default function UploadPage() {
           </button>
 
           <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-800">
-            <p className="font-semibold mb-1">📋 Upload Guidelines:</p>
+            <p className="font-semibold mb-1">📋 Document Tier Guide:</p>
             <ul className="list-disc list-inside space-y-1 text-xs">
-              <li>Maximum file size: 50 MB (Supabase free tier limit)</li>
-              <li>Supported: PDF, Word, Excel, PowerPoint, images, ZIP</li>
-              <li>Files are securely stored and encrypted</li>
-              <li>Admin-only access to upload</li>
+              <li><strong>Tier 1:</strong> High-level Policies (Quality, Environmental, OHS)</li>
+              <li><strong>Tier 2:</strong> IMS Manuals, Plans, Master Document Lists</li>
+              <li><strong>Tier 3:</strong> Detailed Procedures (SOPs)</li>
+              <li><strong>Tier 4:</strong> Work Instructions, Flowcharts</li>
+              <li><strong>Tier 5:</strong> Forms, Checklists, Records</li>
             </ul>
           </div>
 

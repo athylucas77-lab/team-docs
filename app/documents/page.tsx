@@ -7,6 +7,14 @@ import { supabase } from '@/lib/supabase'
 
 const ADMIN_EMAIL = 'harlene@example.com'
 
+const TIERS = [
+  { id: 'tier-1-policies', label: 'Tier 1 - Policies', icon: '📋', color: 'bg-blue-100 text-blue-800' },
+  { id: 'tier-2-ims-manual', label: 'Tier 2 - IMS Manual, Plan, Document List', icon: '📘', color: 'bg-purple-100 text-purple-800' },
+  { id: 'tier-3-procedures', label: 'Tier 3 - Procedures', icon: '📑', color: 'bg-amber-100 text-amber-800' },
+  { id: 'tier-4-work-instructions', label: 'Tier 4 - Work Instructions, Flowcharts', icon: '📃', color: 'bg-emerald-100 text-emerald-800' },
+  { id: 'tier-5-forms', label: 'Tier 5 - Forms', icon: '📝', color: 'bg-rose-100 text-rose-800' },
+]
+
 interface DocumentFile {
   name: string
   id: string | null
@@ -19,12 +27,22 @@ interface DocumentFile {
   } | null
 }
 
+interface TierDocuments {
+  tierId: string
+  tierLabel: string
+  tierIcon: string
+  tierColor: string
+  documents: DocumentFile[]
+}
+
 export default function DocumentsPage() {
-  const [documents, setDocuments] = useState<DocumentFile[]>([])
+  const [tieredDocuments, setTieredDocuments] = useState<TierDocuments[]>([])
+  const [totalCount, setTotalCount] = useState(0)
   const [userEmail, setUserEmail] = useState('')
   const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [expandedTiers, setExpandedTiers] = useState<Set<string>>(new Set(TIERS.map(t => t.id)))
   const router = useRouter()
 
   useEffect(() => {
@@ -42,26 +60,44 @@ export default function DocumentsPage() {
     setUserEmail(user.email || '')
     setIsAdmin(user.email === ADMIN_EMAIL)
 
-    const { data, error } = await supabase.storage
-      .from('documents')
-      .list('', {
-        limit: 100,
-        offset: 0,
-        sortBy: { column: 'created_at', order: 'desc' },
-      })
+    // Load documents from each tier folder
+    const tiered: TierDocuments[] = []
+    let total = 0
 
-    if (error) {
-      setError('Could not load documents: ' + error.message)
-    } else {
-      setDocuments(data || [])
+    for (const tier of TIERS) {
+      const { data, error: listError } = await supabase.storage
+        .from('documents')
+        .list(tier.id, {
+          limit: 100,
+          offset: 0,
+          sortBy: { column: 'created_at', order: 'desc' },
+        })
+
+      if (listError) {
+        console.error(`Error loading ${tier.label}:`, listError.message)
+      }
+
+      const docs = (data || []).filter(d => d.name !== '.emptyFolderPlaceholder')
+      tiered.push({
+        tierId: tier.id,
+        tierLabel: tier.label,
+        tierIcon: tier.icon,
+        tierColor: tier.color,
+        documents: docs,
+      })
+      total += docs.length
     }
+
+    setTieredDocuments(tiered)
+    setTotalCount(total)
     setLoading(false)
   }
 
-  const handleDownload = async (fileName: string) => {
+  const handleDownload = async (tierId: string, fileName: string) => {
+    const filePath = `${tierId}/${fileName}`
     const { data, error } = await supabase.storage
       .from('documents')
-      .createSignedUrl(fileName, 3600)
+      .createSignedUrl(filePath, 3600)
 
     if (error) {
       alert('Could not download: ' + error.message)
@@ -76,6 +112,18 @@ export default function DocumentsPage() {
   const handleSignOut = async () => {
     await supabase.auth.signOut()
     router.push('/')
+  }
+
+  const toggleTier = (tierId: string) => {
+    setExpandedTiers(prev => {
+      const next = new Set(prev)
+      if (next.has(tierId)) {
+        next.delete(tierId)
+      } else {
+        next.add(tierId)
+      }
+      return next
+    })
   }
 
   const formatFileSize = (bytes: number) => {
@@ -146,10 +194,10 @@ export default function DocumentsPage() {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
           <div>
             <h2 className="text-2xl md:text-3xl font-bold text-white mb-1">
-              Company Documents
+              IMS Document Library
             </h2>
             <p className="text-green-200 text-sm">
-              {documents.length} {documents.length === 1 ? 'document' : 'documents'} available
+              {totalCount} {totalCount === 1 ? 'document' : 'documents'} across {TIERS.length} tiers
               {!isAdmin && ' • View only'}
             </p>
           </div>
@@ -169,47 +217,75 @@ export default function DocumentsPage() {
           </div>
         )}
 
-        {documents.length === 0 ? (
-          <div className="bg-white/10 backdrop-blur-sm rounded-xl p-12 text-center border border-green-700/30">
-            <div className="text-6xl mb-4">📂</div>
-            <p className="text-white text-lg font-medium mb-2">No documents yet</p>
-            <p className="text-green-200 text-sm">
-              {isAdmin 
-                ? 'Upload your first document to get started' 
-                : 'Documents will appear here once the admin uploads them'
-              }
-            </p>
-          </div>
-        ) : (
-          <div className="bg-white rounded-xl shadow-2xl overflow-hidden">
-            <div className="divide-y divide-gray-200">
-              {documents.map((doc) => (
-                <div
-                  key={doc.id || doc.name}
-                  className="px-5 py-4 hover:bg-green-50 transition flex items-center justify-between gap-4"
+        {/* Tier Sections */}
+        <div className="space-y-4">
+          {tieredDocuments.map((tier) => {
+            const isExpanded = expandedTiers.has(tier.tierId)
+            return (
+              <div key={tier.tierId} className="bg-white rounded-xl shadow-2xl overflow-hidden">
+                
+                {/* Tier Header (Clickable) */}
+                <button
+                  onClick={() => toggleTier(tier.tierId)}
+                  className="w-full px-5 py-4 flex items-center justify-between hover:bg-gray-50 transition"
                 >
-                  <div className="flex items-center gap-4 flex-1 min-w-0">
-                    <div className="text-3xl">{getFileIcon(doc.name)}</div>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium text-gray-900 truncate">
-                        {doc.name}
-                      </p>
-                      <p className="text-xs text-gray-500 mt-1">
-                        {formatFileSize(doc.metadata?.size || 0)} • Uploaded {formatDate(doc.created_at)}
-                      </p>
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <div className="text-2xl">{tier.tierIcon}</div>
+                    <div className="text-left flex-1 min-w-0">
+                      <h3 className="font-bold text-gray-900 text-base md:text-lg truncate">
+                        {tier.tierLabel}
+                      </h3>
+                      <span className={`inline-block text-xs font-medium px-2 py-0.5 rounded-full mt-1 ${tier.tierColor}`}>
+                        {tier.documents.length} {tier.documents.length === 1 ? 'document' : 'documents'}
+                      </span>
                     </div>
                   </div>
-                  <button
-                    onClick={() => handleDownload(doc.name)}
-                    className="bg-green-700 hover:bg-green-800 text-white text-sm font-medium px-4 py-2 rounded-lg transition whitespace-nowrap"
-                  >
-                    View / Download
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+                  <div className="text-2xl text-gray-400 ml-2">
+                    {isExpanded ? '▼' : '▶'}
+                  </div>
+                </button>
+
+                {/* Tier Documents (Collapsible) */}
+                {isExpanded && (
+                  <div className="border-t border-gray-200">
+                    {tier.documents.length === 0 ? (
+                      <div className="px-5 py-8 text-center text-gray-400 text-sm">
+                        No documents in this tier yet
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-gray-100">
+                        {tier.documents.map((doc) => (
+                          <div
+                            key={doc.id || doc.name}
+                            className="px-5 py-3 hover:bg-green-50 transition flex items-center justify-between gap-4"
+                          >
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                              <div className="text-2xl">{getFileIcon(doc.name)}</div>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-medium text-gray-900 truncate">
+                                  {doc.name}
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  {formatFileSize(doc.metadata?.size || 0)} • {formatDate(doc.created_at)}
+                                </p>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => handleDownload(tier.tierId, doc.name)}
+                              className="bg-green-700 hover:bg-green-800 text-white text-xs md:text-sm font-medium px-3 md:px-4 py-2 rounded-lg transition whitespace-nowrap"
+                            >
+                              View / Download
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
 
         <p className="text-center text-xs text-green-300 mt-12">
           © 2026 Operon Middle East — An Edgenta Company
