@@ -1,45 +1,34 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { createClient } from '@supabase/supabase-js'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+import { supabase } from '@/lib/supabase'
 
 // ⭐ ADMIN EMAIL
 const ADMIN_EMAIL = 'harlene@example.com'
 
-export default function NCRPage() {
-
+export default function NCRFormPage() {
   const router = useRouter()
 
   const [loading, setLoading] = useState(true)
   const [userEmail, setUserEmail] = useState('')
-  const [isAdmin, setIsAdmin] = useState(false)
   const [canEdit, setCanEdit] = useState(false)
-  const [ncrs, setNCRs] = useState<any[]>([])
 
-  // =========================
-  // LOAD NCR LIST
-  // =========================
-  const loadNCRs = async () => {
-    const { data, error } = await supabase
-      .from('ncrs')
-      .select('*')
-      .order('created_at', { ascending: false })
-
-    if (!error) setNCRs(data || [])
-  }
+  const [form, setForm] = useState({
+    title: '',
+    description: '',
+    rootCause: '',
+    correctiveAction: ''
+  })
 
   // =========================
   // INIT USER ROLE
   // =========================
-  const init = async () => {
+  useEffect(() => {
+    init()
+  }, [])
 
+  const init = async () => {
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {
@@ -50,127 +39,117 @@ export default function NCRPage() {
     const email = (user.email || '').toLowerCase()
     setUserEmail(email)
 
-    const adminAccess = email === ADMIN_EMAIL.toLowerCase()
-    setIsAdmin(adminAccess)
+    const isAdmin = email === ADMIN_EMAIL.toLowerCase()
 
-    let editorAccess = false
-
-    if (!adminAccess) {
+    let isEditor = false
+    if (!isAdmin) {
       const { data } = await supabase
         .from('ncr_editors')
         .select('email')
         .ilike('email', email)
         .maybeSingle()
 
-      editorAccess = !!data
+      isEditor = !!data
     }
 
-    setCanEdit(adminAccess || editorAccess)
-
-    await loadNCRs()
-    setLoading(false)
-  }
-
-  useEffect(() => {
-    init()
-  }, [])
-
-  // =========================
-  // DELETE NCR
-  // =========================
-  const deleteNCR = async (id: string, owner: string) => {
-
-    if (!isAdmin && owner !== userEmail) {
-      alert('You can only delete your own NCR.')
+    if (!isAdmin && !isEditor) {
+      alert('Viewer access only')
+      router.push('/')
       return
     }
 
-    if (!confirm('Delete this NCR?')) return
+    setCanEdit(true)
+    setLoading(false)
+  }
 
-    await supabase
-      .from('ncrs')
-      .delete()
-      .eq('id', id)
+  // =========================
+  // HANDLE INPUT
+  // =========================
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    setForm({ ...form, [e.target.name]: e.target.value })
+  }
 
-    loadNCRs()
+  // =========================
+  // SUBMIT NCR
+  // =========================
+  const submitNCR = async () => {
+    await supabase.from('ncrs').insert({
+      ncr_number: `NCR-${Date.now()}`,
+      title: form.title,
+      description: form.description,
+      root_cause: form.rootCause,
+      corrective_action: form.correctiveAction,
+      created_by: userEmail
+    })
+
+    alert('NCR submitted successfully')
+
+    setForm({
+      title: '',
+      description: '',
+      rootCause: '',
+      correctiveAction: ''
+    })
   }
 
   if (loading) return <p>Loading...</p>
 
   // =========================
-  // UI
+  // UI (ACTUAL NCR FORM)
   // =========================
   return (
-    <div style={{ padding: 20 }}>
+    <div
+      style={{
+        maxWidth: 700,
+        margin: '40px auto',
+        padding: 30,
+        border: '1px solid #ccc',
+        borderRadius: 6
+      }}
+    >
+      <h2>Non‑Conformance Report (NCR)</h2>
 
-      <h1>NCR Register</h1>
+      <label>Title</label>
+      <input
+        name="title"
+        value={form.title}
+        onChange={handleChange}
+        style={{ width: '100%', marginBottom: 12 }}
+      />
 
-      <p>
-        Logged in as: <b>{userEmail}</b>
-      </p>
+      <label>Description of Non‑Conformance</label>
+      <textarea
+        name="description"
+        value={form.description}
+        onChange={handleChange}
+        style={{ width: '100%', height: 90, marginBottom: 12 }}
+      />
 
-      <p>
-        Role:
-        {isAdmin && ' Admin'}
-        {!isAdmin && canEdit && ' Editor'}
-        {!canEdit && ' Viewer'}
-      </p>
+      <label>Root Cause Analysis</label>
+      <textarea
+        name="rootCause"
+        value={form.rootCause}
+        onChange={handleChange}
+        style={{ width: '100%', height: 90, marginBottom: 12 }}
+      />
 
-      {/* NEW NCR */}
+      <label>Corrective Action Plan</label>
+      <textarea
+        name="correctiveAction"
+        value={form.correctiveAction}
+        onChange={handleChange}
+        style={{ width: '100%', height: 90 }}
+      />
+
+      <br /><br />
+
       {canEdit && (
-        <Link href="/ncr/create">
-          <button>+ New NCR</button>
-        </Link>
+        <button onClick={submitNCR}>
+          Submit NCR
+        </button>
       )}
-
-      <hr />
-
-      <table border={1} cellPadding={10}>
-        <thead>
-          <tr>
-            <th>NCR #</th>
-            <th>Title</th>
-            <th>Owner</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-
-        <tbody>
-          {ncrs.map((ncr) => {
-
-            const isOwner = ncr.created_by === userEmail
-
-            return (
-              <tr key={ncr.id}>
-                <td>{ncr.ncr_number}</td>
-                <td>{ncr.title}</td>
-                <td>{ncr.created_by}</td>
-
-                <td>
-                  {/* EDIT */}
-                  {(canEdit && (isAdmin || isOwner)) && (
-                    <Link href={`/ncr/${ncr.id}`}>
-                      <button>Edit</button>
-                    </Link>
-                  )}
-
-                  {/* DELETE */}
-                  {(isAdmin || isOwner) && (
-                    <button
-                      onClick={() =>
-                        deleteNCR(ncr.id, ncr.created_by)
-                      }
-                    >
-                      Delete
-                    </button>
-                  )}
-                </td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
-
     </div>
   )
 }
