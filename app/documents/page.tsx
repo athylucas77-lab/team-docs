@@ -82,6 +82,21 @@ const PlusIcon = ({ className = '' }: { className?: string }) => (
   </svg>
 )
 
+const HomeIcon = ({ className = '' }: { className?: string }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+    <polyline points="9 22 9 12 15 12 15 22" />
+  </svg>
+)
+
+const AlertIcon = ({ className = '' }: { className?: string }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+    <line x1="12" y1="9" x2="12" y2="13" />
+    <line x1="12" y1="17" x2="12.01" y2="17" />
+  </svg>
+)
+
 export default function DocumentsPage() {
   const [tieredDocuments, setTieredDocuments] = useState<TierDocuments[]>([])
   const [totalCount, setTotalCount] = useState(0)
@@ -241,8 +256,30 @@ export default function DocumentsPage() {
             </div>
           </div>
 
-          {/* Tier nav */}
+          {/* Nav */}
           <nav className="flex-1 p-3 overflow-y-auto">
+            {/* Home link */}
+            <Link
+              href="/dashboard"
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left mb-2 hover:bg-emerald-800/50 text-emerald-100 transition-all"
+            >
+              <div className="w-8 h-8 rounded-md bg-emerald-800 text-emerald-300 flex items-center justify-center shrink-0">
+                <HomeIcon className="w-4 h-4" />
+              </div>
+              <span className="text-sm font-medium">Home</span>
+            </Link>
+
+            {/* NCR link */}
+            <Link
+              href="/ncr"
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left mb-3 hover:bg-emerald-800/50 text-emerald-100 transition-all"
+            >
+              <div className="w-8 h-8 rounded-md bg-emerald-800 text-emerald-300 flex items-center justify-center shrink-0">
+                <AlertIcon className="w-4 h-4" />
+              </div>
+              <span className="text-sm font-medium">Non-Conformance</span>
+            </Link>
+
             <div className="text-[10px] font-semibold text-emerald-400/80 uppercase tracking-wider px-3 py-2">
               Document Tiers
             </div>
@@ -341,10 +378,12 @@ export default function DocumentsPage() {
           <header className="bg-white border-b border-emerald-100 px-8 py-4">
             <div className="flex items-center justify-between gap-6">
               <div className="flex items-center gap-2 text-sm text-emerald-700/70 min-w-0">
-                <span className="shrink-0">Document Library</span>
+                <Link href="/dashboard" className="shrink-0 hover:text-emerald-950 transition">
+                  Home
+                </Link>
                 <ChevronRightIcon className="w-4 h-4 shrink-0" />
                 <span className="text-emerald-950 font-medium truncate">
-                  {current?.tierLabel}
+                  Document Library — {current?.tierLabel}
                 </span>
               </div>
               <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 text-emerald-800 rounded-full text-xs font-medium ring-1 ring-emerald-600/20 shrink-0">
