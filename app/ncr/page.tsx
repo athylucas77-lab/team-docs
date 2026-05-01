@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -47,12 +48,9 @@ export default function NCRPage() {
     }
 
     const email = (user.email || '').toLowerCase()
-
     setUserEmail(email)
 
-    const adminAccess =
-      email === ADMIN_EMAIL.toLowerCase()
-
+    const adminAccess = email === ADMIN_EMAIL.toLowerCase()
     setIsAdmin(adminAccess)
 
     let editorAccess = false
@@ -76,27 +74,6 @@ export default function NCRPage() {
   useEffect(() => {
     init()
   }, [])
-
-  // =========================
-  // CREATE NCR
-  // =========================
-  const createNCR = async () => {
-
-    const title = prompt('Enter NCR Title')
-
-    if (!title) return
-
-    const ncrNumber =
-      'NCR-' + new Date().getTime()
-
-    await supabase.from('ncrs').insert({
-      ncr_number: ncrNumber,
-      title,
-      created_by: userEmail
-    })
-
-    loadNCRs()
-  }
 
   // =========================
   // DELETE NCR
@@ -141,9 +118,9 @@ export default function NCRPage() {
 
       {/* NEW NCR */}
       {canEdit && (
-        <button onClick={createNCR}>
-          + New NCR
-        </button>
+        <Link href="/ncr/create">
+          <button>+ New NCR</button>
+        </Link>
       )}
 
       <hr />
@@ -151,6 +128,7 @@ export default function NCRPage() {
       <table border={1} cellPadding={10}>
         <thead>
           <tr>
+            <th>NCR #</th>
             <th>Title</th>
             <th>Owner</th>
             <th>Actions</th>
@@ -160,35 +138,32 @@ export default function NCRPage() {
         <tbody>
           {ncrs.map((ncr) => {
 
-            const isOwner =
-              ncr.created_by === userEmail
+            const isOwner = ncr.created_by === userEmail
 
             return (
               <tr key={ncr.id}>
+                <td>{ncr.ncr_number}</td>
                 <td>{ncr.title}</td>
                 <td>{ncr.created_by}</td>
 
                 <td>
-
                   {/* EDIT */}
-                  {(isAdmin || isOwner) && (
-                    <button>Edit</button>
+                  {(canEdit && (isAdmin || isOwner)) && (
+                    <Link href={`/ncr/${ncr.id}`}>
+                      <button>Edit</button>
+                    </Link>
                   )}
 
                   {/* DELETE */}
                   {(isAdmin || isOwner) && (
                     <button
                       onClick={() =>
-                        deleteNCR(
-                          ncr.id,
-                          ncr.created_by
-                        )
+                        deleteNCR(ncr.id, ncr.created_by)
                       }
                     >
                       Delete
                     </button>
                   )}
-
                 </td>
               </tr>
             )
