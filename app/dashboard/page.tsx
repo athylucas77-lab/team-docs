@@ -44,6 +44,7 @@ const HomeIcon = ({ className = '' }: { className?: string }) => (
 export default function DashboardPage() {
   const [userEmail, setUserEmail] = useState('')
   const [isAdmin, setIsAdmin] = useState(false)
+  const [isEditor, setIsEditor] = useState(false)
   const [loading, setLoading] = useState(true)
   const [documentCount, setDocumentCount] = useState(0)
   const [ncrStats, setNcrStats] = useState({ total: 0, open: 0, inProgress: 0 })
@@ -60,8 +61,20 @@ export default function DashboardPage() {
       return
     }
     setUserEmail(user.email || '')
-    setIsAdmin(user.email === ADMIN_EMAIL)
+    const admin = user.email === ADMIN_EMAIL
+    setIsAdmin(admin)
 
+    // Check if user is an NCR Editor (only matters if they're not admin)
+    if (!admin) {
+      const { data: editor } = await supabase
+        .from('ncr_editors')
+        .select('email')
+        .eq('email', user.email)
+        .maybeSingle()
+      setIsEditor(!!editor)
+    }
+
+    // Count documents across all tiers
     let docTotal = 0
     for (const tierId of TIERS) {
       const { data } = await supabase.storage
@@ -72,6 +85,7 @@ export default function DashboardPage() {
     }
     setDocumentCount(docTotal)
 
+    // Get NCR stats
     const { data: ncrs } = await supabase.from('ncrs').select('status')
     if (ncrs) {
       setNcrStats({
@@ -94,6 +108,15 @@ export default function DashboardPage() {
     const name = userEmail.split('@')[0]
     return name.charAt(0).toUpperCase() + name.slice(1)
   }
+
+  // Role display helpers
+  const roleLabel = isAdmin ? 'Administrator' : isEditor ? 'NCR Editor' : 'Viewer'
+  const accessLabel = isAdmin ? 'Admin access' : isEditor ? 'NCR edit access' : 'Viewer access'
+  const roleDescription = isAdmin
+    ? 'You have full access — upload documents, edit and delete NCRs.'
+    : isEditor
+    ? 'You can view and download documents, and create or edit NCRs.'
+    : 'You can view and download documents, and view NCR reports.'
 
   if (loading) {
     return (
@@ -157,7 +180,7 @@ export default function DashboardPage() {
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-medium text-white truncate flex items-center gap-1">
                   {isAdmin && <span className="text-amber-300">👑</span>}
-                  {isAdmin ? 'Admin' : 'Viewer'}
+                  {isAdmin ? 'Admin' : isEditor ? 'NCR Editor' : 'Viewer'}
                 </div>
                 <div className="text-xs text-emerald-300 truncate">{userEmail}</div>
               </div>
@@ -169,7 +192,6 @@ export default function DashboardPage() {
         </aside>
 
         <main className="flex-1 flex flex-col min-w-0 relative">
-          {/* Watermark */}
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden">
             <img src="/operon-logo-grey.png" alt="" aria-hidden="true" className="w-[700px] max-w-[80%] opacity-[0.05]" />
           </div>
@@ -179,7 +201,7 @@ export default function DashboardPage() {
               <div className="text-sm text-emerald-950 font-medium">Home</div>
               <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 text-emerald-800 rounded-full text-xs font-medium ring-1 ring-emerald-600/20 shrink-0">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                {isAdmin ? 'Admin access' : 'Viewer access'}
+                {accessLabel}
               </div>
             </div>
           </header>
@@ -188,7 +210,7 @@ export default function DashboardPage() {
             <div className="mb-10">
               <div className="text-xs font-mono text-emerald-700/70 mb-1" style={{ fontFamily: "'JetBrains Mono', monospace" }}>WELCOME BACK</div>
               <h1 className="text-3xl font-bold tracking-tight text-emerald-950">Hello, {getGreetingName()} 👋</h1>
-              <p className="text-sm text-emerald-700/70 mt-1">Here's what's happening across your IMS modules today.</p>
+              <p className="text-sm text-emerald-700/70 mt-1">{roleDescription}</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl">
@@ -245,7 +267,7 @@ export default function DashboardPage() {
                     <div className="text-xs text-emerald-700/70 mb-1">Your role</div>
                     <div className="text-sm font-semibold text-emerald-950 flex items-center gap-1">
                       {isAdmin && <span className="text-amber-500">👑</span>}
-                      {isAdmin ? 'Administrator' : 'Viewer'}
+                      {roleLabel}
                     </div>
                   </div>
                   <div>
