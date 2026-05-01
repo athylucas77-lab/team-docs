@@ -62,7 +62,6 @@ export default function DashboardPage() {
     setUserEmail(user.email || '')
     setIsAdmin(user.email === ADMIN_EMAIL)
 
-    // Count documents across all tiers
     let docTotal = 0
     for (const tierId of TIERS) {
       const { data } = await supabase.storage
@@ -73,7 +72,6 @@ export default function DashboardPage() {
     }
     setDocumentCount(docTotal)
 
-    // Get NCR stats
     const { data: ncrs } = await supabase.from('ncrs').select('status')
     if (ncrs) {
       setNcrStats({
@@ -170,8 +168,13 @@ export default function DashboardPage() {
           </div>
         </aside>
 
-        <main className="flex-1 flex flex-col min-w-0">
-          <header className="bg-white border-b border-emerald-100 px-8 py-4">
+        <main className="flex-1 flex flex-col min-w-0 relative">
+          {/* Watermark */}
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden">
+            <img src="/operon-logo-grey.png" alt="" aria-hidden="true" className="w-[700px] max-w-[80%] opacity-[0.05]" />
+          </div>
+
+          <header className="bg-white border-b border-emerald-100 px-8 py-4 relative">
             <div className="flex items-center justify-between gap-6">
               <div className="text-sm text-emerald-950 font-medium">Home</div>
               <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 text-emerald-800 rounded-full text-xs font-medium ring-1 ring-emerald-600/20 shrink-0">
@@ -181,7 +184,7 @@ export default function DashboardPage() {
             </div>
           </header>
 
-          <div className="flex-1 p-8">
+          <div className="flex-1 p-8 relative">
             <div className="mb-10">
               <div className="text-xs font-mono text-emerald-700/70 mb-1" style={{ fontFamily: "'JetBrains Mono', monospace" }}>WELCOME BACK</div>
               <h1 className="text-3xl font-bold tracking-tight text-emerald-950">Hello, {getGreetingName()} 👋</h1>
@@ -258,7 +261,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <footer className="px-8 py-4 border-t border-emerald-100 bg-white text-xs text-emerald-700/70 flex items-center justify-between">
+          <footer className="px-8 py-4 border-t border-emerald-100 bg-white text-xs text-emerald-700/70 flex items-center justify-between relative">
             <div>© 2026 Operon Middle East — An Edgenta Company</div>
             <div className="flex items-center gap-4">
               <span className="flex items-center gap-1.5">
