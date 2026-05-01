@@ -41,7 +41,17 @@ export default function LoginPage() {
         rel="stylesheet"
       />
 
-      {/* Decorative background */}
+      {/* Watermark logo - large faded background */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
+        <img
+          src="/operon-logo-grey.png"
+          alt=""
+          aria-hidden="true"
+          className="w-[700px] max-w-[90vw] opacity-[0.06]"
+        />
+      </div>
+
+      {/* Decorative color blobs */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -right-40 w-96 h-96 rounded-full bg-emerald-200/30 blur-3xl" />
         <div className="absolute -bottom-40 -left-40 w-96 h-96 rounded-full bg-emerald-300/20 blur-3xl" />
@@ -50,13 +60,16 @@ export default function LoginPage() {
       <div className="relative w-full max-w-md">
         {/* Brand badge above card */}
         <div className="flex items-center justify-center gap-2 mb-6">
-          <div className="text-[10px] font-mono text-emerald-700/70 uppercase tracking-[0.2em]" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+          <div
+            className="text-[10px] font-mono text-emerald-700/70 uppercase tracking-[0.2em]"
+            style={{ fontFamily: "'JetBrains Mono', monospace" }}
+          >
             ⏤ ISO IMS Portal
           </div>
         </div>
 
         {/* Card */}
-        <div className="bg-white rounded-2xl shadow-xl border border-emerald-100 p-8 md:p-10">
+        <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-100 p-8 md:p-10">
           {/* Logo */}
           <div className="text-center mb-8">
             <div className="flex justify-center mb-5">
