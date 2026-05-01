@@ -8,11 +8,11 @@ import { supabase } from '@/lib/supabase'
 const ADMIN_EMAIL = 'harlene@example.com'
 
 const TIERS = [
-  { id: 'tier-1-policies', label: 'Tier 1 - Policies', icon: '📋', color: 'bg-blue-100 text-blue-800' },
-  { id: 'tier-2-ims-manual', label: 'Tier 2 - IMS Manual, Plan, Document List', icon: '📘', color: 'bg-purple-100 text-purple-800' },
-  { id: 'tier-3-procedures', label: 'Tier 3 - Procedures', icon: '📑', color: 'bg-amber-100 text-amber-800' },
-  { id: 'tier-4-work-instructions', label: 'Tier 4 - Work Instructions, Flowcharts', icon: '📃', color: 'bg-emerald-100 text-emerald-800' },
-  { id: 'tier-5-forms', label: 'Tier 5 - Forms', icon: '📝', color: 'bg-rose-100 text-rose-800' },
+  { id: 'tier-1-policies', shortLabel: 'Policies', label: 'Tier 1 - Policies', emoji: '🛡️' },
+  { id: 'tier-2-ims-manual', shortLabel: 'IMS Manual, Plan, Document List', label: 'Tier 2 - IMS Manual, Plan, Document List', emoji: '📘' },
+  { id: 'tier-3-procedures', shortLabel: 'Procedures', label: 'Tier 3 - Procedures', emoji: '📑' },
+  { id: 'tier-4-work-instructions', shortLabel: 'Work Instructions, Flowcharts', label: 'Tier 4 - Work Instructions, Flowcharts', emoji: '🔀' },
+  { id: 'tier-5-forms', shortLabel: 'Forms', label: 'Tier 5 - Forms', emoji: '📝' },
 ]
 
 interface DocumentFile {
@@ -30,10 +30,57 @@ interface DocumentFile {
 interface TierDocuments {
   tierId: string
   tierLabel: string
-  tierIcon: string
-  tierColor: string
+  shortLabel: string
+  emoji: string
   documents: DocumentFile[]
 }
+
+// Inline SVG icon components - no external dependencies
+const SearchIcon = ({ className = '' }: { className?: string }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <circle cx="11" cy="11" r="8" />
+    <path d="m21 21-4.3-4.3" />
+  </svg>
+)
+
+const DownloadIcon = ({ className = '' }: { className?: string }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+    <polyline points="7 10 12 15 17 10" />
+    <line x1="12" y1="15" x2="12" y2="3" />
+  </svg>
+)
+
+const ChevronRightIcon = ({ className = '' }: { className?: string }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <polyline points="9 18 15 12 9 6" />
+  </svg>
+)
+
+const FileTextIcon = ({ className = '' }: { className?: string }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+    <polyline points="14 2 14 8 20 8" />
+    <line x1="16" y1="13" x2="8" y2="13" />
+    <line x1="16" y1="17" x2="8" y2="17" />
+    <polyline points="10 9 9 9 8 9" />
+  </svg>
+)
+
+const LogOutIcon = ({ className = '' }: { className?: string }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+    <polyline points="16 17 21 12 16 7" />
+    <line x1="21" y1="12" x2="9" y2="12" />
+  </svg>
+)
+
+const PlusIcon = ({ className = '' }: { className?: string }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <line x1="12" y1="5" x2="12" y2="19" />
+    <line x1="5" y1="12" x2="19" y2="12" />
+  </svg>
+)
 
 export default function DocumentsPage() {
   const [tieredDocuments, setTieredDocuments] = useState<TierDocuments[]>([])
@@ -42,7 +89,8 @@ export default function DocumentsPage() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [expandedTiers, setExpandedTiers] = useState<Set<string>>(new Set(TIERS.map(t => t.id)))
+  const [activeTierId, setActiveTierId] = useState<string>(TIERS[0].id)
+  const [query, setQuery] = useState('')
   const router = useRouter()
 
   useEffect(() => {
@@ -51,7 +99,7 @@ export default function DocumentsPage() {
 
   const checkUserAndLoadDocuments = async () => {
     const { data: { user } } = await supabase.auth.getUser()
-    
+
     if (!user) {
       router.push('/login')
       return
@@ -60,7 +108,6 @@ export default function DocumentsPage() {
     setUserEmail(user.email || '')
     setIsAdmin(user.email === ADMIN_EMAIL)
 
-    // Load documents from each tier folder
     const tiered: TierDocuments[] = []
     let total = 0
 
@@ -81,8 +128,8 @@ export default function DocumentsPage() {
       tiered.push({
         tierId: tier.id,
         tierLabel: tier.label,
-        tierIcon: tier.icon,
-        tierColor: tier.color,
+        shortLabel: tier.shortLabel,
+        emoji: tier.emoji,
         documents: docs,
       })
       total += docs.length
@@ -114,18 +161,6 @@ export default function DocumentsPage() {
     router.push('/')
   }
 
-  const toggleTier = (tierId: string) => {
-    setExpandedTiers(prev => {
-      const next = new Set(prev)
-      if (next.has(tierId)) {
-        next.delete(tierId)
-      } else {
-        next.add(tierId)
-      }
-      return next
-    })
-  }
-
   const formatFileSize = (bytes: number) => {
     if (bytes < 1024) return bytes + ' B'
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
@@ -133,7 +168,7 @@ export default function DocumentsPage() {
   }
 
   const formatDate = (dateString: string | null) => {
-    if (!dateString) return 'Unknown date'
+    if (!dateString) return 'Unknown'
     const date = new Date(dateString)
     return date.toLocaleDateString('en-US', {
       year: 'numeric',
@@ -142,155 +177,331 @@ export default function DocumentsPage() {
     })
   }
 
-  const getFileIcon = (fileName: string) => {
+  const getFileTypeLabel = (fileName: string) => {
     const ext = fileName.split('.').pop()?.toLowerCase()
-    if (ext === 'pdf') return '📄'
-    if (['doc', 'docx'].includes(ext || '')) return '📝'
-    if (['xls', 'xlsx', 'csv'].includes(ext || '')) return '📊'
-    if (['ppt', 'pptx'].includes(ext || '')) return '📽️'
-    if (['jpg', 'jpeg', 'png', 'gif'].includes(ext || '')) return '🖼️'
-    if (['zip', 'rar'].includes(ext || '')) return '🗜️'
-    return '📁'
+    if (ext === 'pdf') return 'PDF Document'
+    if (['doc', 'docx'].includes(ext || '')) return 'Word Document'
+    if (['xls', 'xlsx', 'csv'].includes(ext || '')) return 'Spreadsheet'
+    if (['ppt', 'pptx'].includes(ext || '')) return 'Presentation'
+    if (['jpg', 'jpeg', 'png', 'gif'].includes(ext || '')) return 'Image'
+    if (['zip', 'rar'].includes(ext || '')) return 'Archive'
+    return 'Document'
   }
 
   if (loading) {
     return (
-      <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-900 via-green-800 to-emerald-900">
-        <div className="text-white text-lg">Loading documents...</div>
+      <main
+        className="min-h-screen flex items-center justify-center bg-emerald-50/40"
+        style={{ fontFamily: "'Inter', system-ui, sans-serif" }}
+      >
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 border-2 border-emerald-200 border-t-emerald-700 rounded-full animate-spin" />
+          <div className="text-emerald-800 text-sm">Loading documents…</div>
+        </div>
       </main>
     )
   }
 
+  const current = tieredDocuments.find(t => t.tierId === activeTierId)
+  const filteredDocs = current?.documents.filter(d =>
+    d.name.toLowerCase().includes(query.toLowerCase())
+  ) || []
+
+  const currentIndex = TIERS.findIndex(t => t.id === activeTierId) + 1
+
   return (
-    <main className="min-h-screen bg-gradient-to-br from-green-900 via-green-800 to-emerald-900">
-      
-      <header className="bg-white/10 backdrop-blur-sm border-b border-green-700/50">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div>
-            <h1 className="text-xl md:text-2xl font-bold text-white">
-              ISO IMS Portal
-            </h1>
-            <p className="text-xs text-green-200">Operon Middle East</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="text-right hidden md:block">
-              <p className="text-xs text-green-200">
-                {isAdmin ? '👑 Admin' : '👁️ Viewer'}
-              </p>
-              <p className="text-sm text-white font-medium">{userEmail}</p>
+    <div
+      className="min-h-screen bg-emerald-50/40 text-emerald-950"
+      style={{ fontFamily: "'Inter', system-ui, sans-serif" }}
+    >
+      <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet"
+      />
+
+      <div className="flex min-h-screen">
+        {/* Sidebar */}
+        <aside className="w-72 bg-emerald-900 text-emerald-50 flex flex-col">
+          {/* Brand */}
+          <div className="p-6 border-b border-emerald-800/60">
+            <div className="flex items-center gap-3">
+              <img
+                src="/operon-logo-green.png"
+                alt="Operon"
+                className="w-9 h-9 rounded-lg object-contain bg-white p-1"
+              />
+              <div>
+                <div className="font-semibold text-sm leading-tight text-white">
+                  ISO IMS Portal
+                </div>
+                <div className="text-xs text-emerald-300 leading-tight">
+                  Operon Middle East
+                </div>
+              </div>
             </div>
-            <button
-              onClick={handleSignOut}
-              className="bg-red-600 hover:bg-red-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition"
-            >
-              Sign Out
-            </button>
           </div>
-        </div>
-      </header>
 
-      <div className="max-w-6xl mx-auto px-4 py-8">
-        
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-          <div>
-            <h2 className="text-2xl md:text-3xl font-bold text-white mb-1">
-              IMS Document Library
-            </h2>
-            <p className="text-green-200 text-sm">
-              {totalCount} {totalCount === 1 ? 'document' : 'documents'} across {TIERS.length} tiers
-              {!isAdmin && ' • View only'}
-            </p>
-          </div>
-          {isAdmin && (
-            <Link
-              href="/upload"
-              className="bg-white hover:bg-green-50 text-green-900 font-semibold px-5 py-2 rounded-lg shadow-md transition flex items-center gap-2"
-            >
-              <span>+</span> Upload Document
-            </Link>
-          )}
-        </div>
-
-        {error && (
-          <div className="bg-red-100 border border-red-300 text-red-800 p-4 rounded-lg mb-6">
-            {error}
-          </div>
-        )}
-
-        {/* Tier Sections */}
-        <div className="space-y-4">
-          {tieredDocuments.map((tier) => {
-            const isExpanded = expandedTiers.has(tier.tierId)
-            return (
-              <div key={tier.tierId} className="bg-white rounded-xl shadow-2xl overflow-hidden">
-                
-                {/* Tier Header (Clickable) */}
+          {/* Tier nav */}
+          <nav className="flex-1 p-3 overflow-y-auto">
+            <div className="text-[10px] font-semibold text-emerald-400/80 uppercase tracking-wider px-3 py-2">
+              Document Tiers
+            </div>
+            {tieredDocuments.map((tier, idx) => {
+              const active = activeTierId === tier.tierId
+              return (
                 <button
-                  onClick={() => toggleTier(tier.tierId)}
-                  className="w-full px-5 py-4 flex items-center justify-between hover:bg-gray-50 transition"
+                  key={tier.tierId}
+                  onClick={() => setActiveTierId(tier.tierId)}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left mb-0.5 transition-all ${
+                    active
+                      ? 'bg-emerald-50 text-emerald-950 shadow-sm'
+                      : 'hover:bg-emerald-800/50 text-emerald-100'
+                  }`}
                 >
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <div className="text-2xl">{tier.tierIcon}</div>
-                    <div className="text-left flex-1 min-w-0">
-                      <h3 className="font-bold text-gray-900 text-base md:text-lg truncate">
-                        {tier.tierLabel}
-                      </h3>
-                      <span className={`inline-block text-xs font-medium px-2 py-0.5 rounded-full mt-1 ${tier.tierColor}`}>
-                        {tier.documents.length} {tier.documents.length === 1 ? 'document' : 'documents'}
+                  <div
+                    className={`w-8 h-8 rounded-md flex items-center justify-center shrink-0 text-base ${
+                      active ? 'bg-emerald-600' : 'bg-emerald-800'
+                    }`}
+                  >
+                    {tier.emoji}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`text-[10px] font-mono ${
+                          active ? 'text-emerald-700' : 'text-emerald-400/80'
+                        }`}
+                        style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                      >
+                        T{idx + 1}
+                      </span>
+                      <span className="text-sm font-medium truncate">
+                        {tier.shortLabel}
                       </span>
                     </div>
                   </div>
-                  <div className="text-2xl text-gray-400 ml-2">
-                    {isExpanded ? '▼' : '▶'}
-                  </div>
+                  <span
+                    className={`text-xs font-medium tabular-nums px-1.5 py-0.5 rounded ${
+                      active
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : tier.documents.length > 0
+                        ? 'bg-emerald-700/50 text-emerald-100'
+                        : 'text-emerald-400/60'
+                    }`}
+                  >
+                    {tier.documents.length}
+                  </span>
                 </button>
+              )
+            })}
 
-                {/* Tier Documents (Collapsible) */}
-                {isExpanded && (
-                  <div className="border-t border-gray-200">
-                    {tier.documents.length === 0 ? (
-                      <div className="px-5 py-8 text-center text-gray-400 text-sm">
-                        No documents in this tier yet
-                      </div>
-                    ) : (
-                      <div className="divide-y divide-gray-100">
-                        {tier.documents.map((doc) => (
-                          <div
-                            key={doc.id || doc.name}
-                            className="px-5 py-3 hover:bg-green-50 transition flex items-center justify-between gap-4"
-                          >
-                            <div className="flex items-center gap-3 flex-1 min-w-0">
-                              <div className="text-2xl">{getFileIcon(doc.name)}</div>
-                              <div className="min-w-0 flex-1">
-                                <p className="text-sm font-medium text-gray-900 truncate">
-                                  {doc.name}
-                                </p>
-                                <p className="text-xs text-gray-500">
-                                  {formatFileSize(doc.metadata?.size || 0)} • {formatDate(doc.created_at)}
-                                </p>
-                              </div>
-                            </div>
-                            <button
-                              onClick={() => handleDownload(tier.tierId, doc.name)}
-                              className="bg-green-700 hover:bg-green-800 text-white text-xs md:text-sm font-medium px-3 md:px-4 py-2 rounded-lg transition whitespace-nowrap"
-                            >
-                              View / Download
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
+            {/* Admin upload link */}
+            {isAdmin && (
+              <Link
+                href="/upload"
+                className="mt-4 flex items-center gap-3 px-3 py-2.5 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white transition shadow-sm"
+              >
+                <div className="w-8 h-8 rounded-md bg-emerald-50 text-emerald-900 flex items-center justify-center shrink-0">
+                  <PlusIcon className="w-4 h-4" />
+                </div>
+                <span className="text-sm font-medium">Upload Document</span>
+              </Link>
+            )}
+          </nav>
+
+          {/* User */}
+          <div className="p-3 border-t border-emerald-800/60">
+            <div className="flex items-center gap-3 p-2 rounded-lg">
+              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-emerald-300 to-emerald-500 flex items-center justify-center text-emerald-950 font-semibold text-sm">
+                {userEmail.charAt(0).toUpperCase() || 'U'}
               </div>
-            )
-          })}
-        </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium text-white truncate flex items-center gap-1">
+                  {isAdmin && <span className="text-amber-300">👑</span>}
+                  {isAdmin ? 'Admin' : 'Viewer'}
+                </div>
+                <div className="text-xs text-emerald-300 truncate">
+                  {userEmail}
+                </div>
+              </div>
+              <button
+                onClick={handleSignOut}
+                className="text-emerald-300 hover:text-white p-1.5 rounded-md hover:bg-emerald-800 transition"
+                title="Sign out"
+              >
+                <LogOutIcon className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </aside>
 
-        <p className="text-center text-xs text-green-300 mt-12">
-          © 2026 Operon Middle East — An Edgenta Company
-        </p>
+        {/* Main */}
+        <main className="flex-1 flex flex-col min-w-0">
+          {/* Top bar */}
+          <header className="bg-white border-b border-emerald-100 px-8 py-4">
+            <div className="flex items-center justify-between gap-6">
+              <div className="flex items-center gap-2 text-sm text-emerald-700/70 min-w-0">
+                <span className="shrink-0">Document Library</span>
+                <ChevronRightIcon className="w-4 h-4 shrink-0" />
+                <span className="text-emerald-950 font-medium truncate">
+                  {current?.tierLabel}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 text-emerald-800 rounded-full text-xs font-medium ring-1 ring-emerald-600/20 shrink-0">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                {isAdmin ? 'Full access' : 'View only access'}
+              </div>
+            </div>
+          </header>
+
+          {/* Content */}
+          <div className="flex-1 p-8">
+            {error && (
+              <div className="bg-rose-50 border border-rose-200 text-rose-800 p-4 rounded-lg mb-6 text-sm">
+                {error}
+              </div>
+            )}
+
+            {/* Header */}
+            <div className="mb-8">
+              <div className="flex items-end justify-between gap-4 mb-3">
+                <div className="min-w-0">
+                  <div
+                    className="text-xs font-mono text-emerald-700/70 mb-1"
+                    style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                  >
+                    TIER {String(currentIndex).padStart(2, '0')} / 05
+                  </div>
+                  <h1 className="text-3xl font-bold tracking-tight text-emerald-950">
+                    {current?.shortLabel}
+                  </h1>
+                  <p className="text-sm text-emerald-700/70 mt-1">
+                    {totalCount} {totalCount === 1 ? 'document' : 'documents'} total across {TIERS.length} tiers
+                  </p>
+                </div>
+                <div className="flex items-baseline gap-2 shrink-0">
+                  <span className="text-4xl font-bold tabular-nums text-emerald-700">
+                    {current?.documents.length || 0}
+                  </span>
+                  <span className="text-sm text-emerald-700/70">
+                    {current?.documents.length === 1 ? 'document' : 'documents'}
+                  </span>
+                </div>
+              </div>
+              {/* Tier indicator strip */}
+              <div className="flex gap-1.5">
+                {tieredDocuments.map((t) => (
+                  <div
+                    key={t.tierId}
+                    className={`h-1 flex-1 rounded-full transition-all ${
+                      t.tierId === activeTierId
+                        ? 'bg-emerald-600'
+                        : t.documents.length > 0
+                        ? 'bg-emerald-300'
+                        : 'bg-emerald-100'
+                    }`}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* Search */}
+            <div className="relative mb-6 max-w-md">
+              <SearchIcon className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-emerald-600/60" />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search this tier…"
+                className="w-full pl-10 pr-4 py-2.5 bg-white border border-emerald-200 rounded-lg text-sm text-emerald-950 placeholder:text-emerald-700/40 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition"
+              />
+            </div>
+
+            {/* Documents */}
+            {filteredDocs.length > 0 ? (
+              <div className="bg-white rounded-xl border border-emerald-100 overflow-hidden shadow-sm">
+                <div className="grid grid-cols-12 gap-4 px-6 py-3 border-b border-emerald-100 bg-emerald-50/60 text-[10px] font-semibold uppercase tracking-wider text-emerald-800">
+                  <div className="col-span-6">Document</div>
+                  <div className="col-span-2">Size</div>
+                  <div className="col-span-3">Updated</div>
+                  <div className="col-span-1 text-right">Action</div>
+                </div>
+                {filteredDocs.map((doc) => (
+                  <div
+                    key={doc.id || doc.name}
+                    className="grid grid-cols-12 gap-4 px-6 py-4 items-center border-b border-emerald-50 last:border-0 hover:bg-emerald-50/40 transition group"
+                  >
+                    <div className="col-span-6 flex items-center gap-3 min-w-0">
+                      <div className="w-9 h-9 rounded-md bg-emerald-100 flex items-center justify-center shrink-0 text-emerald-700">
+                        <FileTextIcon className="w-4 h-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium text-emerald-950 truncate">
+                          {doc.name}
+                        </div>
+                        <div className="text-xs text-emerald-700/60">
+                          {getFileTypeLabel(doc.name)}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="col-span-2 text-sm text-emerald-800/80 tabular-nums">
+                      {formatFileSize(doc.metadata?.size || 0)}
+                    </div>
+                    <div className="col-span-3 text-sm text-emerald-800/80">
+                      {formatDate(doc.created_at)}
+                    </div>
+                    <div className="col-span-1 flex justify-end">
+                      <button
+                        onClick={() => handleDownload(current!.tierId, doc.name)}
+                        className="p-2 rounded-md bg-emerald-700 hover:bg-emerald-800 transition shadow-sm text-white"
+                        title="View / Download"
+                      >
+                        <DownloadIcon className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : query ? (
+              <div className="bg-white rounded-xl border border-dashed border-emerald-200 p-16 text-center">
+                <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-4 text-emerald-600">
+                  <SearchIcon className="w-5 h-5" />
+                </div>
+                <div className="text-sm font-medium text-emerald-950 mb-1">
+                  No documents match "{query}"
+                </div>
+                <div className="text-xs text-emerald-700/60">
+                  Try a different search term or clear the search.
+                </div>
+              </div>
+            ) : (
+              <div className="bg-white rounded-xl border border-dashed border-emerald-200 p-16 text-center">
+                <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-4 text-emerald-600">
+                  <FileTextIcon className="w-5 h-5" />
+                </div>
+                <div className="text-sm font-medium text-emerald-950 mb-1">
+                  No documents in this tier yet
+                </div>
+                <div className="text-xs text-emerald-700/60">
+                  {isAdmin
+                    ? 'Use the Upload Document button in the sidebar to add files.'
+                    : 'Documents will appear here once published by an administrator.'}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Footer */}
+          <footer className="px-8 py-4 border-t border-emerald-100 bg-white text-xs text-emerald-700/70 flex items-center justify-between">
+            <div>© 2026 Operon Middle East — An Edgenta Company</div>
+            <div className="flex items-center gap-4">
+              <span className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                Operational
+              </span>
+            </div>
+          </footer>
+        </main>
       </div>
-    </main>
+    </div>
   )
 }
