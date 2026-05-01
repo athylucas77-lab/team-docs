@@ -9,7 +9,7 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
-// ⭐ CHANGE THIS TO YOUR ADMIN EMAIL
+// ⭐ ADMIN EMAIL
 const ADMIN_EMAIL = 'harlene@example.com'
 
 export default function NCRPage() {
@@ -27,7 +27,7 @@ export default function NCRPage() {
   // =========================
   const loadNCRs = async () => {
     const { data, error } = await supabase
-      .from('ncr_register')
+      .from('ncrs')
       .select('*')
       .order('created_at', { ascending: false })
 
@@ -50,7 +50,6 @@ export default function NCRPage() {
 
     setUserEmail(email)
 
-    // ✅ ADMIN CHECK
     const adminAccess =
       email === ADMIN_EMAIL.toLowerCase()
 
@@ -58,7 +57,6 @@ export default function NCRPage() {
 
     let editorAccess = false
 
-    // ✅ CHECK EDITOR TABLE
     if (!adminAccess) {
       const { data } = await supabase
         .from('ncr_editors')
@@ -72,13 +70,33 @@ export default function NCRPage() {
     setCanEdit(adminAccess || editorAccess)
 
     await loadNCRs()
-
     setLoading(false)
   }
 
   useEffect(() => {
     init()
   }, [])
+
+  // =========================
+  // CREATE NCR
+  // =========================
+  const createNCR = async () => {
+
+    const title = prompt('Enter NCR Title')
+
+    if (!title) return
+
+    const ncrNumber =
+      'NCR-' + new Date().getTime()
+
+    await supabase.from('ncrs').insert({
+      ncr_number: ncrNumber,
+      title,
+      created_by: userEmail
+    })
+
+    loadNCRs()
+  }
 
   // =========================
   // DELETE NCR
@@ -90,12 +108,10 @@ export default function NCRPage() {
       return
     }
 
-    const confirmDelete = confirm('Delete this NCR?')
-
-    if (!confirmDelete) return
+    if (!confirm('Delete this NCR?')) return
 
     await supabase
-      .from('ncr_register')
+      .from('ncrs')
       .delete()
       .eq('id', id)
 
@@ -123,9 +139,9 @@ export default function NCRPage() {
         {!canEdit && ' Viewer'}
       </p>
 
-      {/* ✅ NEW NCR BUTTON */}
+      {/* NEW NCR */}
       {canEdit && (
-        <button onClick={() => alert('Create NCR')}>
+        <button onClick={createNCR}>
           + New NCR
         </button>
       )}
@@ -142,36 +158,41 @@ export default function NCRPage() {
         </thead>
 
         <tbody>
-          {ncrs.map((ncr) => (
-            <tr key={ncr.id}>
-              <td>{ncr.title}</td>
-              <td>{ncr.owner_email}</td>
+          {ncrs.map((ncr) => {
 
-              <td>
+            const isOwner =
+              ncr.created_by === userEmail
 
-                {/* EDIT */}
-                {canEdit && (
-                  <button>Edit</button>
-                )}
+            return (
+              <tr key={ncr.id}>
+                <td>{ncr.title}</td>
+                <td>{ncr.created_by}</td>
 
-                {/* DELETE */}
-                {(isAdmin ||
-                  ncr.owner_email === userEmail) && (
-                  <button
-                    onClick={() =>
-                      deleteNCR(
-                        ncr.id,
-                        ncr.owner_email
-                      )
-                    }
-                  >
-                    Delete
-                  </button>
-                )}
+                <td>
 
-              </td>
-            </tr>
-          ))}
+                  {/* EDIT */}
+                  {(isAdmin || isOwner) && (
+                    <button>Edit</button>
+                  )}
+
+                  {/* DELETE */}
+                  {(isAdmin || isOwner) && (
+                    <button
+                      onClick={() =>
+                        deleteNCR(
+                          ncr.id,
+                          ncr.created_by
+                        )
+                      }
+                    >
+                      Delete
+                    </button>
+                  )}
+
+                </td>
+              </tr>
+            )
+          })}
         </tbody>
       </table>
 
