@@ -41,13 +41,13 @@ export default function LoginPage() {
         rel="stylesheet"
       />
 
-      {/* Watermark logo - large faded background */}
+      {/* Watermark logo - large faded grey landscape background */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
         <img
           src="/operon-logo-grey-landscape.png"
           alt=""
           aria-hidden="true"
-          className="w-[900px] max-w-[95vw] opacity-[0.05]"
+          className="w-[1100px] max-w-[95vw] opacity-[0.07]"
         />
       </div>
 
@@ -69,106 +69,98 @@ export default function LoginPage() {
         </div>
 
         {/* Card */}
-        <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-100 overflow-hidden">
-          {/* Logo header band */}
-          <div className="bg-gradient-to-b from-emerald-50/60 to-transparent px-8 pt-10 pb-6 border-b border-emerald-100/60">
-            <div className="flex justify-center">
+        <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl border border-emerald-100 p-8 md:p-10">
+          {/* Logo */}
+          <div className="text-center mb-8">
+            <div className="flex justify-center mb-5">
               {!logoError ? (
                 <img
-                  src="/operon-logo-grey-landscape.png"
-                  alt="Operon Middle East"
-                  className="h-14 md:h-16 w-auto object-contain"
+                  src="/operon-logo-green.png"
+                  alt="Operon Middle East Logo"
+                  className="w-20 h-20 object-contain"
                   onError={() => setLogoError(true)}
                 />
               ) : (
-                <div className="bg-emerald-700 px-6 py-3 rounded-xl">
+                <div className="bg-emerald-700 p-4 rounded-xl">
                   <div className="text-white text-center">
-                    <div className="text-2xl font-bold tracking-wider">OPERON</div>
-                    <div className="text-[9px] text-emerald-200 mt-1 tracking-widest">
-                      AN EDGENTA COMPANY
-                    </div>
+                    <div className="text-xl font-bold tracking-wider">OPERON</div>
+                    <div className="text-[8px] text-emerald-200 mt-1">AN EDGENTA COMPANY</div>
                   </div>
                 </div>
               )}
             </div>
+            <h1 className="text-2xl font-bold text-emerald-950 tracking-tight">
+              Welcome back
+            </h1>
+            <p className="text-sm text-emerald-700/70 mt-2">
+              Sign in to your Operon Middle East account
+            </p>
           </div>
 
-          {/* Body */}
-          <div className="p-8 md:p-10 pt-7">
-            <div className="text-center mb-7">
-              <h1 className="text-2xl font-bold text-emerald-950 tracking-tight">
-                Welcome back
-              </h1>
-              <p className="text-sm text-emerald-700/70 mt-2">
-                Sign in to your Operon Middle East account
-              </p>
+          {/* Form */}
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+              <label htmlFor="email" className="block text-xs font-semibold text-emerald-800 uppercase tracking-wider mb-1.5">
+                Email Address
+              </label>
+              <input
+                id="email"
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-3 py-2.5 bg-white border border-emerald-200 rounded-lg text-sm text-emerald-950 placeholder:text-emerald-700/40 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition"
+                placeholder="yourname@operon.com"
+              />
             </div>
 
-            {/* Form */}
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div>
-                <label htmlFor="email" className="block text-xs font-semibold text-emerald-800 uppercase tracking-wider mb-1.5">
-                  Email Address
-                </label>
-                <input
-                  id="email"
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full px-3 py-2.5 bg-white border border-emerald-200 rounded-lg text-sm text-emerald-950 placeholder:text-emerald-700/40 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition"
-                  placeholder="yourname@operon.com"
-                />
-              </div>
+            <div>
+              <label htmlFor="password" className="block text-xs font-semibold text-emerald-800 uppercase tracking-wider mb-1.5">
+                Password
+              </label>
+              <input
+                id="password"
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-3 py-2.5 bg-white border border-emerald-200 rounded-lg text-sm text-emerald-950 placeholder:text-emerald-700/40 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition"
+                placeholder="••••••••"
+              />
+            </div>
 
-              <div>
-                <label htmlFor="password" className="block text-xs font-semibold text-emerald-800 uppercase tracking-wider mb-1.5">
-                  Password
-                </label>
-                <input
-                  id="password"
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-3 py-2.5 bg-white border border-emerald-200 rounded-lg text-sm text-emerald-950 placeholder:text-emerald-700/40 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition"
-                  placeholder="••••••••"
-                />
+            {error && (
+              <div className="bg-rose-50 border border-rose-200 text-rose-800 text-sm p-3 rounded-lg flex items-start gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 mt-0.5 shrink-0">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="8" x2="12" y2="12" />
+                  <line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
+                <span>{error}</span>
               </div>
+            )}
 
-              {error && (
-                <div className="bg-rose-50 border border-rose-200 text-rose-800 text-sm p-3 rounded-lg flex items-start gap-2">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 mt-0.5 shrink-0">
-                    <circle cx="12" cy="12" r="10" />
-                    <line x1="12" y1="8" x2="12" y2="12" />
-                    <line x1="12" y1="16" x2="12.01" y2="16" />
-                  </svg>
-                  <span>{error}</span>
-                </div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-emerald-700 hover:bg-emerald-800 disabled:bg-emerald-400 text-white font-semibold py-3 rounded-lg shadow-sm transition flex items-center justify-center gap-2"
+            >
+              {loading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Signing in…
+                </>
+              ) : (
+                'Sign In'
               )}
+            </button>
+          </form>
 
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-emerald-700 hover:bg-emerald-800 disabled:bg-emerald-400 text-white font-semibold py-3 rounded-lg shadow-sm transition flex items-center justify-center gap-2"
-              >
-                {loading ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Signing in…
-                  </>
-                ) : (
-                  'Sign In'
-                )}
-              </button>
-            </form>
-
-            {/* Footer link */}
-            <div className="mt-6 text-center">
-              <Link href="/" className="text-sm text-emerald-700 hover:text-emerald-900 hover:underline transition">
-                ← Back to Home
-              </Link>
-            </div>
+          {/* Footer link */}
+          <div className="mt-6 text-center">
+            <Link href="/" className="text-sm text-emerald-700 hover:text-emerald-900 hover:underline transition">
+              ← Back to Home
+            </Link>
           </div>
         </div>
 
