@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 
 const ADMIN_EMAIL = 'harlene@example.com'
-const CERT_BUCKET = 'ISO IMS Certificates' // Storage bucket name (with spaces — must match Supabase exactly)
+const CERT_BUCKET = 'ISO IMS Certificates'
 
 const TIERS = [
   'tier-1-policies',
@@ -121,7 +121,6 @@ export default function DashboardPage() {
   const [certificates, setCertificates] = useState<Certificate[]>([])
   const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({})
 
-  // Upload modal state
   const [showUpload, setShowUpload] = useState(false)
   const [certName, setCertName] = useState('')
   const [certDesc, setCertDesc] = useState('')
@@ -130,7 +129,6 @@ export default function DashboardPage() {
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState('')
 
-  // Delete confirmation state
   const [deletingCert, setDeletingCert] = useState<Certificate | null>(null)
   const [deleting, setDeleting] = useState(false)
 
@@ -141,8 +139,10 @@ export default function DashboardPage() {
   }, [])
 
   const init = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
+    // PATCHED: capture auth errors and clear bad tokens before redirecting
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      await supabase.auth.signOut()
       router.push('/login')
       return
     }
