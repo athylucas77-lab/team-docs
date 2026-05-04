@@ -14,16 +14,18 @@ export default function Home() {
         <div className="flex justify-center mb-8">
           {!logoError ? (
             <img
-              src="/operon-logo.png"
-              alt="Operon Middle East Logo"
-              className="w-48 h-48 object-contain rounded-2xl shadow-2xl"
+              src="/operon-logo-white.png"
+              alt="Operon Middle East"
+              className="h-32 md:h-40 w-auto object-contain drop-shadow-2xl"
               onError={() => setLogoError(true)}
             />
           ) : (
-            <div className="w-48 h-48 bg-black rounded-2xl shadow-2xl flex items-center justify-center">
+            <div className="bg-white/10 backdrop-blur-sm border border-white/20 px-10 py-6 rounded-2xl shadow-2xl">
               <div className="text-white text-center">
-                <div className="text-3xl font-bold tracking-wider">OPERON</div>
-                <div className="text-xs text-green-300 mt-2">AN EDGENTA COMPANY</div>
+                <div className="text-3xl md:text-4xl font-bold tracking-wider">OPERON</div>
+                <div className="text-[10px] md:text-xs text-green-200 mt-2 tracking-[0.2em]">
+                  AN EDGENTA COMPANY
+                </div>
               </div>
             </div>
           )}
