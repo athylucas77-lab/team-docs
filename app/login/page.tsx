@@ -11,6 +11,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [logoError, setLogoError] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
   const router = useRouter()
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -41,14 +42,16 @@ export default function LoginPage() {
         rel="stylesheet"
       />
 
-      {/* Watermark logo - large faded grey landscape background */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
+      {/* Full background image with green tone overlay */}
+      <div className="absolute inset-0 pointer-events-none select-none">
         <img
-          src="/operon-logo-grey-landscape.png"
+          src="/operon-logo-designer-01.png"
           alt=""
           aria-hidden="true"
-          className="w-[1100px] max-w-[95vw] opacity-[0.07]"
+          className="w-full h-full object-cover"
         />
+        {/* Overlay to shift teal → vivid green to match reference */}
+        <div className="absolute inset-0" style={{ backgroundColor: '#006B2B', mixBlendMode: 'hue', opacity: 0.6 }} />
       </div>
 
       {/* Decorative color blobs */}
@@ -61,7 +64,7 @@ export default function LoginPage() {
         {/* Brand badge above card */}
         <div className="flex items-center justify-center gap-2 mb-6">
           <div
-            className="text-[10px] font-mono text-emerald-700/70 uppercase tracking-[0.2em]"
+            className="text-[10px] font-mono text-white/70 uppercase tracking-[0.2em]"
             style={{ fontFamily: "'JetBrains Mono', monospace" }}
           >
             ⏤ ISO IMS Portal
@@ -118,15 +121,38 @@ export default function LoginPage() {
               <label htmlFor="password" className="block text-xs font-semibold text-emerald-800 uppercase tracking-wider mb-1.5">
                 Password
               </label>
-              <input
-                id="password"
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-3 py-2.5 bg-white border border-emerald-200 rounded-lg text-sm text-emerald-950 placeholder:text-emerald-700/40 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition"
-                placeholder="••••••••"
-              />
+              <div className="relative">
+                <input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full px-3 py-2.5 pr-10 bg-white border border-emerald-200 rounded-lg text-sm text-emerald-950 placeholder:text-emerald-700/40 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition"
+                  placeholder="••••••••"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-600 hover:text-emerald-900 transition"
+                  tabIndex={-1}
+                >
+                  {showPassword ? (
+                    // Eye-off icon
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+                      <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+                      <line x1="1" y1="1" x2="23" y2="23" />
+                    </svg>
+                  ) : (
+                    // Eye icon
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  )}
+                </button>
+              </div>
             </div>
 
             {error && (
@@ -165,10 +191,10 @@ export default function LoginPage() {
         </div>
 
         {/* Outside card footer */}
-        <p className="text-xs text-emerald-700/60 text-center mt-6">
+        <p className="text-xs text-white/60 text-center mt-6">
           Need help? Contact your IT administrator.
         </p>
-        <p className="text-xs text-emerald-700/50 text-center mt-2">
+        <p className="text-xs text-white/50 text-center mt-2">
           © 2026 Operon Middle East — An Edgenta Company
         </p>
       </div>

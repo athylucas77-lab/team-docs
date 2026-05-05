@@ -324,10 +324,10 @@ export default function DocumentsPage() {
       .from('folder_ownership')
       .insert({ tier_id: activeTierId, folder_slug: slug, created_by: userId })
 
-    if (ownershipError) {
-      console.error('Could not record folder ownership:', ownershipError.message)
-      // Non-fatal — folder is created, ownership just won't be tracked
-    }
+if (ownershipError) {
+  console.error('Full ownership error:', JSON.stringify(ownershipError))
+  alert('Ownership error: ' + JSON.stringify(ownershipError))
+}
 
     setNewFolderName('')
     setShowCreateFolder(false)
