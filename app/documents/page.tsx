@@ -88,11 +88,6 @@ const XIcon = ({ className = '' }: { className?: string }) => (
     <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
   </svg>
 )
-const CheckCircleIcon = ({ className = '' }: { className?: string }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" />
-  </svg>
-)
 const FolderPlusIcon = ({ className = '' }: { className?: string }) => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" /><line x1="12" y1="11" x2="12" y2="17" /><line x1="9" y1="14" x2="15" y2="14" />
@@ -119,13 +114,14 @@ interface DocumentFile {
   id: string | null
   created_at: string | null
   metadata: { size: number; mimetype: string } | null
-  subfolder?: string // undefined = root level
+  subfolder?: string
 }
 
 interface SubFolder {
-  name: string   // slug, e.g. "human-resource"
-  label: string  // display, e.g. "Human Resource"
+  name: string
+  label: string
   documents: DocumentFile[]
+  createdBy: string | null // uuid of the user who created this folder (null = unknown/legacy)
 }
 
 interface TierData {
@@ -149,21 +145,29 @@ export default function DocumentsPage() {
   const [userEmail, setUserEmail] = useState('')
   const [isAdmin, setIsAdmin] = useState(false)
   const [isEditor, setIsEditor] = useState(false)
+  const [userId, setUserId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   // Navigation
   const [activeTierId, setActiveTierId] = useState(TIERS[0].id)
-  // null = "All Documents", '__root__' = root-level files only, else subfolder slug
   const [activeSubfolder, setActiveSubfolder] = useState<string | null>(null)
   const [expandedTiers, setExpandedTiers] = useState<Set<string>>(new Set([TIERS[0].id]))
 
   // Search
   const [query, setQuery] = useState('')
 
-  // Delete
+  // Delete document
   const [deletingDoc, setDeletingDoc] = useState<{ tierId: string; fileName: string; subfolder?: string } | null>(null)
   const [deleting, setDeleting] = useState(false)
+
+  // Delete folder
+  const [deletingFolder, setDeletingFolder] = useState<{
+    tierId: string
+    folderSlug: string
+    folderLabel: string
+  } | null>(null)
+  const [deletingFolderBusy, setDeletingFolderBusy] = useState(false)
 
   // Create folder
   const [showCreateFolder, setShowCreateFolder] = useState(false)
@@ -178,14 +182,24 @@ export default function DocumentsPage() {
   // ── Init ──────────────────────────────────────────────────────────────────
   const init = async () => {
     const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) { await supabase.auth.signOut(); router.push('/login'); return }
+    if (authError || !user) {
+      await supabase.auth.signOut()
+      router.push('/login')
+      return
+    }
+
     setUserEmail(user.email || '')
+    setUserId(user.id)
 
     const admin = user.email === ADMIN_EMAIL
     setIsAdmin(admin)
 
     if (!admin) {
-      const { data: ed } = await supabase.from('ncr_editors').select('email').eq('email', user.email).maybeSingle()
+      const { data: ed } = await supabase
+        .from('ncr_editors')
+        .select('email')
+        .eq('email', user.email)
+        .maybeSingle()
       setIsEditor(!!ed)
     }
 
@@ -194,11 +208,20 @@ export default function DocumentsPage() {
 
   // ── Load documents — dynamically discovers subfolders from Storage ─────────
   const loadDocuments = async () => {
+    // Load all folder ownership records in one query
+    const { data: ownershipRows } = await supabase
+      .from('folder_ownership')
+      .select('tier_id, folder_slug, created_by')
+
+    const ownershipMap = new Map<string, string>()
+    for (const row of ownershipRows || []) {
+      ownershipMap.set(`${row.tier_id}::${row.folder_slug}`, row.created_by)
+    }
+
     const tiered: TierData[] = []
     let total = 0
 
     for (const tier of TIERS) {
-      // List the tier root — folders appear with id === null and no metadata
       const { data: rootItems, error: rootErr } = await supabase.storage
         .from('documents')
         .list(tier.id, { limit: 200, sortBy: { column: 'name', order: 'asc' } })
@@ -207,17 +230,14 @@ export default function DocumentsPage() {
 
       const items = rootItems || []
 
-      // Files at the tier root
       const rootFiles = items.filter(
         (i) => i.metadata !== null && i.name !== '.emptyFolderPlaceholder'
       ) as DocumentFile[]
 
-      // Subfolder entries (id === null, no metadata)
       const folderItems = items.filter(
         (i) => i.id === null && i.name !== '.emptyFolderPlaceholder'
       )
 
-      // Load each subfolder's contents
       const subfolders: SubFolder[] = []
       for (const fi of folderItems) {
         const { data: contents } = await supabase.storage
@@ -228,7 +248,15 @@ export default function DocumentsPage() {
           .filter((f) => f.metadata !== null && f.name !== '.emptyFolderPlaceholder')
           .map((f) => ({ ...f, subfolder: fi.name })) as DocumentFile[]
 
-        subfolders.push({ name: fi.name, label: toLabel(fi.name), documents: files })
+        // Look up who created this folder
+        const createdBy = ownershipMap.get(`${tier.id}::${fi.name}`) ?? null
+
+        subfolders.push({
+          name: fi.name,
+          label: toLabel(fi.name),
+          documents: files,
+          createdBy,
+        })
       }
 
       const allDocuments = [...rootFiles, ...subfolders.flatMap((sf) => sf.documents)]
@@ -250,9 +278,10 @@ export default function DocumentsPage() {
     setLoading(false)
   }
 
-  // ── Create folder — works for Admin + Editor, in any tier ─────────────────
+  // ── Create folder — Admin can always; Editor can create (ownership recorded) ─
   const handleCreateFolder = async () => {
     if (!newFolderName.trim()) { setFolderError('Please enter a folder name.'); return }
+    if (!userId) return
 
     setCreatingFolder(true)
     setFolderError('')
@@ -266,7 +295,6 @@ export default function DocumentsPage() {
 
     if (!slug) { setFolderError('Invalid folder name. Use letters and numbers only.'); setCreatingFolder(false); return }
 
-    // Check duplicate
     const current = tieredDocuments.find((t) => t.tierId === activeTierId)
     if (current?.subfolders.some((sf) => sf.name === slug)) {
       setFolderError('A folder with this name already exists.')
@@ -274,7 +302,7 @@ export default function DocumentsPage() {
       return
     }
 
-    // Create by uploading a placeholder file
+    // Create placeholder file in Storage
     const placeholderPath = `${activeTierId}/${slug}/.emptyFolderPlaceholder`
     const blob = new Blob([''], { type: 'text/plain' })
     const { error: uploadError } = await supabase.storage
@@ -291,14 +319,76 @@ export default function DocumentsPage() {
       return
     }
 
+    // ✅ Record ownership in the database so editors can only delete their own folders
+    const { error: ownershipError } = await supabase
+      .from('folder_ownership')
+      .insert({ tier_id: activeTierId, folder_slug: slug, created_by: userId })
+
+    if (ownershipError) {
+      console.error('Could not record folder ownership:', ownershipError.message)
+      // Non-fatal — folder is created, ownership just won't be tracked
+    }
+
     setNewFolderName('')
     setShowCreateFolder(false)
     setCreatingFolder(false)
 
-    // Auto-expand this tier and select the new folder
     setExpandedTiers((prev) => new Set(prev).add(activeTierId))
     setActiveSubfolder(slug)
 
+    await loadDocuments()
+  }
+
+  // ── Delete folder ─────────────────────────────────────────────────────────
+  const handleDeleteFolder = async () => {
+    if (!deletingFolder) return
+
+    const { tierId, folderSlug } = deletingFolder
+    const folder = tieredDocuments
+      .find((t) => t.tierId === tierId)
+      ?.subfolders.find((s) => s.name === folderSlug)
+
+    if (!folder) return
+
+    // ✅ Permission check:
+    //    - Admins can always delete
+    //    - Editors can only delete folders they personally created
+    if (!isAdmin) {
+      if (folder.createdBy !== userId) {
+        alert('You can only delete folders you created.')
+        setDeletingFolder(null)
+        return
+      }
+    }
+
+    setDeletingFolderBusy(true)
+
+    // Remove all files inside the folder from Storage
+    const filesToRemove = [
+      `${tierId}/${folderSlug}/.emptyFolderPlaceholder`,
+      ...folder.documents.map((d) => `${tierId}/${folderSlug}/${d.name}`),
+    ]
+
+    const { error: removeError } = await supabase.storage
+      .from('documents')
+      .remove(filesToRemove)
+
+    if (removeError) {
+      alert('Could not delete folder contents: ' + removeError.message)
+      setDeletingFolderBusy(false)
+      return
+    }
+
+    // ✅ Remove ownership record
+    await supabase
+      .from('folder_ownership')
+      .delete()
+      .eq('tier_id', tierId)
+      .eq('folder_slug', folderSlug)
+
+    setDeletingFolder(null)
+    setDeletingFolderBusy(false)
+    setActiveSubfolder(null)
     await loadDocuments()
   }
 
@@ -376,7 +466,6 @@ export default function DocumentsPage() {
     ? visibleDocs.filter((d) => d.name.toLowerCase().includes(query.toLowerCase()))
     : visibleDocs
 
-  // Show folder column when viewing "All" and there are subfolders
   const showFolderCol = activeSubfolder === null && (current?.subfolders.length ?? 0) > 0
 
   const currentIndex = TIERS.findIndex((t) => t.id === activeTierId) + 1
@@ -389,6 +478,18 @@ export default function DocumentsPage() {
       : activeSubfolder === '__root__'
       ? 'Root Files'
       : current?.subfolders.find((s) => s.name === activeSubfolder)?.label
+
+  // ✅ Can the current user delete the active subfolder?
+  //    Admins: always yes. Editors: only if they created it.
+  const activeSubfolderData = activeSubfolder && activeSubfolder !== '__root__'
+    ? current?.subfolders.find((s) => s.name === activeSubfolder)
+    : null
+
+  const canDeleteActiveFolder =
+    !!activeSubfolderData && (
+      isAdmin ||
+      (isEditor && activeSubfolderData.createdBy === userId)
+    )
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -449,7 +550,6 @@ export default function DocumentsPage() {
                       setExpandedTiers((prev) => {
                         const next = new Set(prev)
                         if (isActive) {
-                          // Toggle expand if already active
                           if (isExpanded) next.delete(tier.tierId)
                           else next.add(tier.tierId)
                         } else {
@@ -500,7 +600,7 @@ export default function DocumentsPage() {
                         <span className="tabular-nums text-[10px] text-emerald-400/70">{tier.allDocuments.length}</span>
                       </button>
 
-                      {/* Root files (only shown if tier has both root files AND subfolders) */}
+                      {/* Root files */}
                       {hasSubfolders && hasRoot && (
                         <button
                           onClick={() => setActiveSubfolder('__root__')}
@@ -517,21 +617,39 @@ export default function DocumentsPage() {
                       )}
 
                       {/* Dynamic subfolders */}
-                      {tier.subfolders.map((sf) => (
-                        <button
-                          key={sf.name}
-                          onClick={() => setActiveSubfolder(sf.name)}
-                          className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-left text-xs transition-all ${
-                            activeSubfolder === sf.name
-                              ? 'bg-emerald-800/80 text-white font-medium'
-                              : 'text-emerald-300 hover:bg-emerald-800/40 hover:text-white'
-                          }`}
-                        >
-                          <FolderIcon className="w-3 h-3 shrink-0 opacity-60" />
-                          <span className="flex-1 truncate">{sf.label}</span>
-                          <span className="tabular-nums text-[10px] text-emerald-400/70">{sf.documents.length}</span>
-                        </button>
-                      ))}
+                      {tier.subfolders.map((sf) => {
+                        const canDeleteThisFolder =
+                          isAdmin || (isEditor && sf.createdBy === userId)
+                        return (
+                          <div key={sf.name} className="flex items-center gap-1">
+                            <button
+                              onClick={() => setActiveSubfolder(sf.name)}
+                              className={`flex-1 flex items-center gap-2 px-2.5 py-1.5 rounded-md text-left text-xs transition-all ${
+                                activeSubfolder === sf.name
+                                  ? 'bg-emerald-800/80 text-white font-medium'
+                                  : 'text-emerald-300 hover:bg-emerald-800/40 hover:text-white'
+                              }`}
+                            >
+                              <FolderIcon className="w-3 h-3 shrink-0 opacity-60" />
+                              <span className="flex-1 truncate">{sf.label}</span>
+                              <span className="tabular-nums text-[10px] text-emerald-400/70">{sf.documents.length}</span>
+                            </button>
+                            {canDeleteThisFolder && (
+                              <button
+                                onClick={() => setDeletingFolder({
+                                  tierId: tier.tierId,
+                                  folderSlug: sf.name,
+                                  folderLabel: sf.label,
+                                })}
+                                className="p-1 rounded text-emerald-500 hover:text-rose-400 hover:bg-emerald-800/60 transition shrink-0"
+                                title="Delete folder"
+                              >
+                                <TrashIcon className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
+                        )
+                      })}
 
                       {/* New Folder button — Admin + Editor */}
                       {canManageFolders && (
@@ -623,34 +741,72 @@ export default function DocumentsPage() {
             <div className="mb-8">
               <div className="flex items-start justify-between gap-4 mb-3">
                 <div className="min-w-0">
-                  <div className="text-xs font-mono text-emerald-700/70 mb-1" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                  <div
+                    className="text-xs font-mono text-emerald-700/70 mb-1"
+                    style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                  >
                     TIER {String(currentIndex).padStart(2, '0')} / 05
                   </div>
+
                   <h1 className="text-3xl font-bold tracking-tight text-emerald-950">
                     {current?.shortLabel}
                     {activeSubfolderLabel && (
-                      <span className="text-emerald-700/70 font-medium text-2xl"> · {activeSubfolderLabel}</span>
+                      <span className="text-emerald-700/70 font-medium text-2xl">
+                        {' '}· {activeSubfolderLabel}
+                      </span>
                     )}
                   </h1>
+
                   <p className="text-sm text-emerald-700/70 mt-1">
-                    {totalCount} {totalCount === 1 ? 'document' : 'documents'} total across {TIERS.length} tiers
+                    {totalCount}{' '}
+                    {totalCount === 1 ? 'document' : 'documents'} total across{' '}
+                    {TIERS.length} tiers
                   </p>
                 </div>
 
                 <div className="flex items-center gap-3 shrink-0">
-                  {/* New Folder button — Admin + Editor */}
+                  {/* ✅ Delete Folder button — only shown if current user has permission */}
+                  {canDeleteActiveFolder && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!activeSubfolderData) return
+                        setDeletingFolder({
+                          tierId: current!.tierId,
+                          folderSlug: activeSubfolderData.name,
+                          folderLabel: activeSubfolderData.label,
+                        })
+                      }}
+                      className="flex items-center gap-2 px-3 py-2 bg-white border border-rose-200 hover:bg-rose-50 hover:border-rose-400 text-rose-700 text-sm font-medium rounded-lg transition shadow-sm"
+                    >
+                      <TrashIcon className="w-4 h-4" />
+                      Delete Folder
+                    </button>
+                  )}
+
+                  {/* New Folder — Admin + Editor */}
                   {canManageFolders && (
                     <button
-                      onClick={() => { setShowCreateFolder(true); setFolderError(''); setNewFolderName('') }}
+                      type="button"
+                      onClick={() => {
+                        setShowCreateFolder(true)
+                        setFolderError('')
+                        setNewFolderName('')
+                      }}
                       className="flex items-center gap-2 px-3 py-2 bg-white border border-emerald-200 hover:border-emerald-400 hover:bg-emerald-50 text-emerald-800 text-sm font-medium rounded-lg transition shadow-sm"
                     >
                       <FolderPlusIcon className="w-4 h-4" />
                       New Folder
                     </button>
                   )}
+
                   <div className="flex items-baseline gap-2">
-                    <span className="text-4xl font-bold tabular-nums text-emerald-700">{visibleDocs.length}</span>
-                    <span className="text-sm text-emerald-700/70">{visibleDocs.length === 1 ? 'doc' : 'docs'}</span>
+                    <span className="text-4xl font-bold tabular-nums text-emerald-700">
+                      {visibleDocs.length}
+                    </span>
+                    <span className="text-sm text-emerald-700/70">
+                      {visibleDocs.length === 1 ? 'doc' : 'docs'}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -661,81 +817,28 @@ export default function DocumentsPage() {
                   <div
                     key={t.tierId}
                     className={`h-1 flex-1 rounded-full transition-all ${
-                      t.tierId === activeTierId ? 'bg-emerald-600' : t.allDocuments.length > 0 ? 'bg-emerald-300' : 'bg-emerald-100'
+                      t.tierId === activeTierId
+                        ? 'bg-emerald-600'
+                        : t.allDocuments.length > 0
+                        ? 'bg-emerald-300'
+                        : 'bg-emerald-100'
                     }`}
                   />
                 ))}
               </div>
             </div>
 
-            {/* ── Search bar ── */}
-            <div className="mb-4 max-w-md">
-              <div className="relative">
-                <SearchIcon className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-emerald-600/60 pointer-events-none" />
-                <input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder={`Search ${activeSubfolderLabel ? activeSubfolderLabel : current?.shortLabel ?? 'documents'}…`}
-                  className="w-full pl-10 pr-10 py-2.5 bg-white border border-emerald-200 rounded-lg text-sm text-emerald-950 placeholder:text-emerald-700/40 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition"
-                />
-                {query && (
-                  <button
-                    onClick={() => setQuery('')}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-400 hover:text-emerald-800 transition"
-                    title="Clear search"
-                  >
-                    <XIcon className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
-
-              {/* Search result feedback — shows immediately as user types */}
-              {hasSearch && (
-                <div className={`mt-2 flex items-center gap-2 text-xs font-medium px-3 py-2 rounded-lg border ${
-                  filteredDocs.length > 0
-                    ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
-                    : 'bg-rose-50 border-rose-200 text-rose-700'
-                }`}>
-                  {filteredDocs.length > 0 ? (
-                    <>
-                      <CheckCircleIcon className="w-3.5 h-3.5 shrink-0 text-emerald-600" />
-                      <span>
-                        <strong>{filteredDocs.length}</strong> document{filteredDocs.length !== 1 ? 's' : ''} found for &ldquo;<strong>{query}</strong>&rdquo;
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <XIcon className="w-3.5 h-3.5 shrink-0" />
-                      <span>
-                        No documents found for &ldquo;<strong>{query}</strong>&rdquo;
-                      </span>
-                      <button
-                        onClick={() => setQuery('')}
-                        className="ml-auto underline underline-offset-2 hover:text-rose-900 transition"
-                      >
-                        Clear
-                      </button>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-
             {/* ── Document table ── */}
             {filteredDocs.length > 0 ? (
               <div className="bg-white rounded-xl border border-emerald-100 overflow-hidden shadow-sm">
-                {/* Table header */}
-                <div className={`grid gap-4 px-6 py-3 border-b border-emerald-100 bg-emerald-50/60 text-[10px] font-semibold uppercase tracking-wider text-emerald-800 ${
-                  showFolderCol ? 'grid-cols-12' : 'grid-cols-12'
-                }`}>
+                <div className={`grid gap-4 px-6 py-3 border-b border-emerald-100 bg-emerald-50/60 text-[10px] font-semibold uppercase tracking-wider text-emerald-800 grid-cols-12`}>
                   <div className={showFolderCol ? 'col-span-4' : 'col-span-6'}>Document</div>
                   {showFolderCol && <div className="col-span-2">Folder</div>}
                   <div className="col-span-2">Size</div>
-                  <div className={showFolderCol ? 'col-span-3' : 'col-span-3'}>Uploaded</div>
+                  <div className="col-span-3">Uploaded</div>
                   <div className="col-span-1 text-right">{isAdmin ? 'Actions' : 'Action'}</div>
                 </div>
 
-                {/* Rows */}
                 {filteredDocs.map((doc) => {
                   const sfLabel = doc.subfolder
                     ? current?.subfolders.find((s) => s.name === doc.subfolder)?.label || toLabel(doc.subfolder)
@@ -746,7 +849,6 @@ export default function DocumentsPage() {
                       key={`${doc.subfolder || 'root'}-${doc.id || doc.name}`}
                       className="grid grid-cols-12 gap-4 px-6 py-4 items-center border-b border-emerald-50 last:border-0 hover:bg-emerald-50/40 transition group"
                     >
-                      {/* Document name */}
                       <div className={`${showFolderCol ? 'col-span-4' : 'col-span-6'} flex items-center gap-3 min-w-0`}>
                         <div className="w-9 h-9 rounded-md bg-emerald-100 flex items-center justify-center shrink-0 text-emerald-700">
                           <FileTextIcon className="w-4 h-4" />
@@ -757,7 +859,6 @@ export default function DocumentsPage() {
                         </div>
                       </div>
 
-                      {/* Folder badge */}
                       {showFolderCol && (
                         <div className="col-span-2">
                           {sfLabel ? (
@@ -771,17 +872,14 @@ export default function DocumentsPage() {
                         </div>
                       )}
 
-                      {/* Size */}
                       <div className="col-span-2 text-sm text-emerald-800/80 tabular-nums">
                         {formatSize(doc.metadata?.size || 0)}
                       </div>
 
-                      {/* Date */}
-                      <div className={`${showFolderCol ? 'col-span-3' : 'col-span-3'} text-sm text-emerald-800/80`}>
+                      <div className="col-span-3 text-sm text-emerald-800/80">
                         {formatDate(doc.created_at)}
                       </div>
 
-                      {/* Actions */}
                       <div className="col-span-1 flex justify-end gap-1.5">
                         <button
                           onClick={() => handleDownload(current!.tierId, doc.name, doc.subfolder)}
@@ -790,6 +888,7 @@ export default function DocumentsPage() {
                         >
                           <DownloadIcon className="w-4 h-4" />
                         </button>
+                        {/* ✅ Delete document — Admin only */}
                         {isAdmin && (
                           <button
                             onClick={() => setDeletingDoc({ tierId: current!.tierId, fileName: doc.name, subfolder: doc.subfolder })}
@@ -805,7 +904,6 @@ export default function DocumentsPage() {
                 })}
               </div>
             ) : hasSearch ? (
-              /* Search empty state */
               <div className="bg-white/80 backdrop-blur-sm rounded-xl border border-dashed border-rose-200 p-16 text-center">
                 <div className="w-12 h-12 rounded-full bg-rose-50 flex items-center justify-center mx-auto mb-4 text-rose-400">
                   <SearchIcon className="w-5 h-5" />
@@ -827,7 +925,6 @@ export default function DocumentsPage() {
                 </button>
               </div>
             ) : (
-              /* No documents state */
               <div className="bg-white/80 backdrop-blur-sm rounded-xl border border-dashed border-emerald-200 p-16 text-center">
                 <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-4 text-emerald-600">
                   <FileTextIcon className="w-5 h-5" />
@@ -942,7 +1039,54 @@ export default function DocumentsPage() {
         </div>
       )}
 
-      {/* ── Delete Confirmation Modal — Admin only ───────────────────────────── */}
+      {/* ── Delete Folder Confirmation Modal ─────────────────────────────────── */}
+      {deletingFolder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-emerald-950/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 border border-emerald-100">
+            <div className="flex items-start gap-4 mb-4">
+              <div className="w-11 h-11 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+                <TrashIcon className="w-5 h-5" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-lg font-bold text-emerald-950 mb-1">Delete folder?</h3>
+                <p className="text-sm text-emerald-700/80">
+                  This will permanently delete the folder{' '}
+                  <span className="font-medium text-emerald-950">{deletingFolder.folderLabel}</span>{' '}
+                  and all documents inside it. This action cannot be undone.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2 justify-end mt-6">
+              <button
+                onClick={() => setDeletingFolder(null)}
+                disabled={deletingFolderBusy}
+                className="px-4 py-2 text-sm font-medium text-emerald-800 hover:bg-emerald-50 rounded-lg transition disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteFolder}
+                disabled={deletingFolderBusy}
+                className="px-4 py-2 text-sm font-medium bg-rose-600 hover:bg-rose-700 text-white rounded-lg transition shadow-sm disabled:opacity-50 flex items-center gap-2"
+              >
+                {deletingFolderBusy ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Deleting…
+                  </>
+                ) : (
+                  <>
+                    <TrashIcon className="w-4 h-4" />
+                    Delete Folder
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Delete Document Confirmation Modal — Admin only ───────────────────── */}
       {deletingDoc && isAdmin && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-emerald-950/40 backdrop-blur-sm p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 border border-emerald-100">
