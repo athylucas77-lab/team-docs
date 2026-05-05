@@ -500,15 +500,15 @@ if (ownershipError) {
 
         {/* ── Sidebar ─────────────────────────────────────────────────────── */}
         <aside className="w-72 bg-emerald-900 text-emerald-50 flex flex-col">
-          <div className="p-6 border-b border-emerald-800/60">
-            <div className="flex items-center gap-3">
-              <img src="/operon-logo-green.png" alt="Operon" className="w-9 h-9 rounded-lg object-contain bg-white p-1" />
-              <div>
-                <div className="font-semibold text-sm leading-tight text-white">ISO IMS Portal</div>
-                <div className="text-xs text-emerald-300 leading-tight">Operon Middle East</div>
-              </div>
-            </div>
-          </div>
+<Link href="/about" className="p-6 border-b border-emerald-800/60 hover:bg-emerald-800/30 transition-all block">
+  <div className="flex items-center gap-3">
+    <img src="/operon-logo-green.png" alt="Operon" className="w-9 h-9 rounded-lg object-contain bg-white p-1" />
+    <div>
+      <div className="font-semibold text-sm leading-tight text-white">ISO IMS Portal</div>
+      <div className="text-xs text-emerald-300 leading-tight">Operon Middle East</div>
+    </div>
+  </div>
+</Link>
 
           <nav className="flex-1 p-3 overflow-y-auto">
             {/* Home */}
