@@ -18,14 +18,19 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  const { data: { user } } = await supabase.auth.getUser()
-
   const { pathname } = request.nextUrl
 
   // Public routes — always accessible
-  const publicRoutes = ['/', '/login', '/unauthorized', '/share']
-  const isPublic = publicRoutes.some(r => pathname === r || pathname.startsWith('/share/'))
+  const isPublic =
+    pathname === '/' ||
+    pathname === '/login' ||
+    pathname === '/unauthorized' ||
+    pathname.startsWith('/share/') ||
+    pathname.startsWith('/auth/')
+
   if (isPublic) return supabaseResponse
+
+  const { data: { user } } = await supabase.auth.getUser()
 
   // Not logged in — redirect to login
   if (!user) {
@@ -60,10 +65,14 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
+    '/',
+    '/login',
     '/dashboard/:path*',
     '/documents/:path*',
     '/ncr/:path*',
     '/upload/:path*',
     '/about/:path*',
+    '/auth/:path*',
+    '/share/:path*',
   ],
 }

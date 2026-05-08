@@ -30,7 +30,7 @@ export async function POST(request: Request) {
     // Invite the user — sends email automatically
     const { data: inviteData, error: inviteError } = await adminSupabase.auth.admin.inviteUserByEmail(email, {
       data: { invited_by: user.email },
-      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/dashboard`,
+      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/confirm`,
     })
 
     if (inviteError) {
