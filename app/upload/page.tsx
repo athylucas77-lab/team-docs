@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase'
+const supabase = createClient()
 import { listExistingNames } from '../../lib/storage'
 
 const ADMIN_EMAIL = 'harlene@example.com'
