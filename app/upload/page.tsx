@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase'
 const supabase = createClient()
 import { listExistingNames } from '../../lib/storage'
 
-const ADMIN_EMAIL = 'harlene@example.com'
+const ADMIN_EMAIL = 'harlene.m@operon.co'
 
 const TIERS = [
   { id: 'tier-1-policies', label: 'Tier 1 — Policies' },

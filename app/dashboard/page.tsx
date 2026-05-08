@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
 const supabase = createClient()
 
-const ADMIN_EMAIL = 'harlene@example.com'
+const ADMIN_EMAIL = 'harlene.m@operon.co'
 const CERT_BUCKET = 'ISO IMS Certificates'
 
 const TIERS = [
@@ -133,90 +133,88 @@ export default function DashboardPage() {
   const [deletingCert, setDeletingCert] = useState<Certificate | null>(null)
   const [deleting, setDeleting] = useState(false)
 
-const router = useRouter()
-const loadingCanvasRef = useRef<HTMLCanvasElement>(null)
+  const router = useRouter()
+  const loadingCanvasRef = useRef<HTMLCanvasElement>(null)
 
-useEffect(() => {
-  init()
-}, [])
+  useEffect(() => {
+    init()
+  }, [])
 
-// Animated particle network for loading screen
-useEffect(() => {
-  if (!loading) return
-  const canvas = loadingCanvasRef.current
-  if (!canvas) return
-  const ctx = canvas.getContext('2d')
-  if (!ctx) return
+  useEffect(() => {
+    if (!loading) return
+    const canvas = loadingCanvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
 
-  let animationId: number
-  let particles: Array<{ x: number; y: number; vx: number; vy: number; radius: number }> = []
+    let animationId: number
+    let particles: Array<{ x: number; y: number; vx: number; vy: number; radius: number }> = []
 
-  const resizeCanvas = () => {
-    canvas.width = window.innerWidth
-    canvas.height = window.innerHeight
-  }
-
-  const initParticles = () => {
-    const count = Math.min(80, Math.floor((canvas.width * canvas.height) / 20000))
-    particles = []
-    for (let i = 0; i < count; i++) {
-      particles.push({
-        x: Math.random() * canvas.width,
-        y: Math.random() * canvas.height,
-        vx: (Math.random() - 0.5) * 0.4,
-        vy: (Math.random() - 0.5) * 0.4,
-        radius: Math.random() * 1.5 + 0.5,
-      })
+    const resizeCanvas = () => {
+      canvas.width = window.innerWidth
+      canvas.height = window.innerHeight
     }
-  }
 
-  const animate = () => {
-    ctx.clearRect(0, 0, canvas.width, canvas.height)
-    particles.forEach((p) => {
-      p.x += p.vx
-      p.y += p.vy
-      if (p.x < 0 || p.x > canvas.width) p.vx *= -1
-      if (p.y < 0 || p.y > canvas.height) p.vy *= -1
-      ctx.beginPath()
-      ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2)
-      ctx.fillStyle = 'rgba(167, 243, 208, 0.6)'
-      ctx.fill()
-    })
-    const maxDistance = 140
-    for (let i = 0; i < particles.length; i++) {
-      for (let j = i + 1; j < particles.length; j++) {
-        const dx = particles[i].x - particles[j].x
-        const dy = particles[i].y - particles[j].y
-        const distance = Math.sqrt(dx * dx + dy * dy)
-        if (distance < maxDistance) {
-          const opacity = (1 - distance / maxDistance) * 0.3
-          ctx.beginPath()
-          ctx.moveTo(particles[i].x, particles[i].y)
-          ctx.lineTo(particles[j].x, particles[j].y)
-          ctx.strokeStyle = `rgba(110, 231, 183, ${opacity})`
-          ctx.lineWidth = 0.6
-          ctx.stroke()
-        }
+    const initParticles = () => {
+      const count = Math.min(80, Math.floor((canvas.width * canvas.height) / 20000))
+      particles = []
+      for (let i = 0; i < count; i++) {
+        particles.push({
+          x: Math.random() * canvas.width,
+          y: Math.random() * canvas.height,
+          vx: (Math.random() - 0.5) * 0.4,
+          vy: (Math.random() - 0.5) * 0.4,
+          radius: Math.random() * 1.5 + 0.5,
+        })
       }
     }
-    animationId = requestAnimationFrame(animate)
-  }
 
-  resizeCanvas()
-  initParticles()
-  animate()
+    const animate = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height)
+      particles.forEach((p) => {
+        p.x += p.vx
+        p.y += p.vy
+        if (p.x < 0 || p.x > canvas.width) p.vx *= -1
+        if (p.y < 0 || p.y > canvas.height) p.vy *= -1
+        ctx.beginPath()
+        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2)
+        ctx.fillStyle = 'rgba(167, 243, 208, 0.6)'
+        ctx.fill()
+      })
+      const maxDistance = 140
+      for (let i = 0; i < particles.length; i++) {
+        for (let j = i + 1; j < particles.length; j++) {
+          const dx = particles[i].x - particles[j].x
+          const dy = particles[i].y - particles[j].y
+          const distance = Math.sqrt(dx * dx + dy * dy)
+          if (distance < maxDistance) {
+            const opacity = (1 - distance / maxDistance) * 0.3
+            ctx.beginPath()
+            ctx.moveTo(particles[i].x, particles[i].y)
+            ctx.lineTo(particles[j].x, particles[j].y)
+            ctx.strokeStyle = `rgba(110, 231, 183, ${opacity})`
+            ctx.lineWidth = 0.6
+            ctx.stroke()
+          }
+        }
+      }
+      animationId = requestAnimationFrame(animate)
+    }
 
-  const onResize = () => { resizeCanvas(); initParticles() }
-  window.addEventListener('resize', onResize)
+    resizeCanvas()
+    initParticles()
+    animate()
 
-  return () => {
-    cancelAnimationFrame(animationId)
-    window.removeEventListener('resize', onResize)
-  }
-}, [loading])
+    const onResize = () => { resizeCanvas(); initParticles() }
+    window.addEventListener('resize', onResize)
+
+    return () => {
+      cancelAnimationFrame(animationId)
+      window.removeEventListener('resize', onResize)
+    }
+  }, [loading])
 
   const init = async () => {
-    // PATCHED: capture auth errors and clear bad tokens before redirecting
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
       await supabase.auth.signOut()
@@ -224,17 +222,20 @@ useEffect(() => {
       return
     }
     setUserEmail(user.email || '')
-    const admin = user.email === ADMIN_EMAIL
-    setIsAdmin(admin)
 
-    if (!admin) {
-      const { data: editor } = await supabase
-        .from('ncr_editors')
-        .select('email')
-        .eq('email', user.email)
-        .maybeSingle()
-      setIsEditor(!!editor)
-    }
+    // Check role from profiles table
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+
+    const role = profile?.role || 'user'
+    const admin = role === 'admin'
+    const editor = role === 'co-admin' || (!admin && await checkIsEditor(user.email || ''))
+
+    setIsAdmin(admin)
+    setIsEditor(editor)
 
     let docTotal = 0
     for (const tierId of TIERS) {
@@ -267,6 +268,15 @@ useEffect(() => {
 
     await loadCertificates()
     setLoading(false)
+  }
+
+  const checkIsEditor = async (email: string) => {
+    const { data } = await supabase
+      .from('ncr_editors')
+      .select('email')
+      .eq('email', email)
+      .maybeSingle()
+    return !!data
   }
 
   const loadCertificates = async () => {
@@ -420,86 +430,58 @@ useEffect(() => {
     ? 'You can view and download documents, and create or edit NCRs.'
     : 'You can view and download documents, and view NCR reports.'
 
-if (loading) {
-  return (
-    <main
-      className="min-h-screen flex items-center justify-center px-4 relative overflow-hidden"
-      style={{
-        fontFamily: "'Inter', system-ui, sans-serif",
-        background: 'radial-gradient(ellipse at top right, #0F5A35 0%, #094A2A 50%, #063B22 100%)',
-      }}
-    >
-      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-
-      {/* Animated particle network */}
-      <canvas ref={loadingCanvasRef} className="fixed inset-0 pointer-events-none" style={{ zIndex: 0 }} />
-
-      {/* Soft glow */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none" style={{ zIndex: 1 }}>
-        <div className="absolute -top-20 -right-20 w-[600px] h-[600px] rounded-full bg-emerald-300/8 blur-3xl" />
-        <div className="absolute -bottom-40 -left-40 w-96 h-96 rounded-full bg-emerald-900/30 blur-3xl" />
-      </div>
-
-      {/* Loading content */}
-      <div className="relative flex flex-col items-center gap-8" style={{ zIndex: 2 }}>
-        {/* Logo with animated rings */}
-        <div className="relative w-32 h-32 flex items-center justify-center">
-          {/* Outer pulsing ring */}
-          <div className="absolute inset-0 rounded-full border-2 border-emerald-300/30 animate-ping" style={{ animationDuration: '2s' }} />
-          {/* Middle pulsing ring */}
-          <div className="absolute inset-2 rounded-full border-2 border-emerald-300/40 animate-ping" style={{ animationDuration: '2s', animationDelay: '0.4s' }} />
-          {/* Spinning gradient ring */}
-          <div className="absolute inset-4 rounded-full border-4 border-transparent border-t-emerald-200 border-r-emerald-300 animate-spin" style={{ animationDuration: '1.5s' }} />
-          {/* Logo in center */}
-          <img
-            src="/operon-logo-white.png"
-            alt="Operon"
-            className="w-16 h-16 object-contain relative drop-shadow-2xl"
-          />
+  if (loading) {
+    return (
+      <main
+        className="min-h-screen flex items-center justify-center px-4 relative overflow-hidden"
+        style={{
+          fontFamily: "'Inter', system-ui, sans-serif",
+          background: 'radial-gradient(ellipse at top right, #0F5A35 0%, #094A2A 50%, #063B22 100%)',
+        }}
+      >
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+        <canvas ref={loadingCanvasRef} className="fixed inset-0 pointer-events-none" style={{ zIndex: 0 }} />
+        <div className="fixed inset-0 overflow-hidden pointer-events-none" style={{ zIndex: 1 }}>
+          <div className="absolute -top-20 -right-20 w-[600px] h-[600px] rounded-full bg-emerald-300/8 blur-3xl" />
+          <div className="absolute -bottom-40 -left-40 w-96 h-96 rounded-full bg-emerald-900/30 blur-3xl" />
         </div>
-
-        {/* Brand text */}
-        <div className="text-center">
-          <div className="text-[10px] font-mono uppercase tracking-[0.3em] text-emerald-200/80 mb-2" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-            ⏤ Operon Middle East ⏤
+        <div className="relative flex flex-col items-center gap-8" style={{ zIndex: 2 }}>
+          <div className="relative w-32 h-32 flex items-center justify-center">
+            <div className="absolute inset-0 rounded-full border-2 border-emerald-300/30 animate-ping" style={{ animationDuration: '2s' }} />
+            <div className="absolute inset-2 rounded-full border-2 border-emerald-300/40 animate-ping" style={{ animationDuration: '2s', animationDelay: '0.4s' }} />
+            <div className="absolute inset-4 rounded-full border-4 border-transparent border-t-emerald-200 border-r-emerald-300 animate-spin" style={{ animationDuration: '1.5s' }} />
+            <img src="/operon-logo-white.png" alt="Operon" className="w-16 h-16 object-contain relative drop-shadow-2xl" />
           </div>
-          <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight">
-            ISO IMS Portal
-          </h1>
+          <div className="text-center">
+            <div className="text-[10px] font-mono uppercase tracking-[0.3em] text-emerald-200/80 mb-2" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+              ⏤ Operon Middle East ⏤
+            </div>
+            <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight">ISO IMS Portal</h1>
+          </div>
+          <div className="w-64 h-1 bg-white/10 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-emerald-400 via-emerald-200 to-emerald-400 rounded-full"
+              style={{ backgroundSize: '200% 100%', animation: 'shimmer 2s linear infinite' }}
+            />
+          </div>
+          <div className="flex items-center gap-2 text-sm text-white/80">
+            <span>Loading your dashboard</span>
+            <span className="flex gap-1">
+              <span className="w-1 h-1 rounded-full bg-emerald-300 animate-bounce" style={{ animationDelay: '0s' }} />
+              <span className="w-1 h-1 rounded-full bg-emerald-300 animate-bounce" style={{ animationDelay: '0.15s' }} />
+              <span className="w-1 h-1 rounded-full bg-emerald-300 animate-bounce" style={{ animationDelay: '0.3s' }} />
+            </span>
+          </div>
         </div>
-
-        {/* Loading bar */}
-        <div className="w-64 h-1 bg-white/10 rounded-full overflow-hidden">
-          <div
-            className="h-full bg-gradient-to-r from-emerald-400 via-emerald-200 to-emerald-400 rounded-full"
-            style={{
-              backgroundSize: '200% 100%',
-              animation: 'shimmer 2s linear infinite',
-            }}
-          />
-        </div>
-
-        {/* Loading text with animated dots */}
-        <div className="flex items-center gap-2 text-sm text-white/80">
-          <span>Loading your dashboard</span>
-          <span className="flex gap-1">
-            <span className="w-1 h-1 rounded-full bg-emerald-300 animate-bounce" style={{ animationDelay: '0s' }} />
-            <span className="w-1 h-1 rounded-full bg-emerald-300 animate-bounce" style={{ animationDelay: '0.15s' }} />
-            <span className="w-1 h-1 rounded-full bg-emerald-300 animate-bounce" style={{ animationDelay: '0.3s' }} />
-          </span>
-        </div>
-      </div>
-
-      {/* Shimmer keyframe */}
-      <style jsx>{`
-        @keyframes shimmer {
-          0% { background-position: 200% 0; }
-          100% { background-position: -200% 0; }
-        }
-      `}</style>
-    </main>
-  )
-}
+        <style jsx>{`
+          @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+          }
+        `}</style>
+      </main>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-emerald-50/40 text-emerald-950" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
@@ -507,26 +489,24 @@ if (loading) {
 
       <div className="flex min-h-screen">
         <aside className="w-72 bg-emerald-900 text-emerald-50 flex flex-col">
-<Link href="/about" className="p-6 border-b border-emerald-800/60 hover:bg-emerald-800/30 transition-all block">
-  <div className="flex items-center gap-3">
-    <img src="/operon-logo-green.png" alt="Operon" className="w-9 h-9 rounded-lg object-contain bg-white p-1" />
-    <div>
-      <div className="font-semibold text-sm leading-tight text-white">ISO IMS Portal</div>
-      <div className="text-xs text-emerald-300 leading-tight">Operon Middle East</div>
-    </div>
-  </div>
-</Link>
+          <Link href="/about" className="p-6 border-b border-emerald-800/60 hover:bg-emerald-800/30 transition-all block">
+            <div className="flex items-center gap-3">
+              <img src="/operon-logo-green.png" alt="Operon" className="w-9 h-9 rounded-lg object-contain bg-white p-1" />
+              <div>
+                <div className="font-semibold text-sm leading-tight text-white">ISO IMS Portal</div>
+                <div className="text-xs text-emerald-300 leading-tight">Operon Middle East</div>
+              </div>
+            </div>
+          </Link>
 
           <nav className="flex-1 p-3">
             <div className="text-[10px] font-semibold text-emerald-400/80 uppercase tracking-wider px-3 py-2">Modules</div>
-
             <div className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left mb-0.5 bg-emerald-50 text-emerald-950 shadow-sm">
               <div className="w-8 h-8 rounded-md bg-emerald-600 text-white flex items-center justify-center shrink-0">
                 <HomeIcon className="w-4 h-4" />
               </div>
               <span className="text-sm font-medium">Home</span>
             </div>
-
             <Link href="/documents" className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left mb-0.5 hover:bg-emerald-800/50 text-emerald-100 transition-all">
               <div className="w-8 h-8 rounded-md bg-emerald-800 text-emerald-300 flex items-center justify-center shrink-0">
                 <FolderIcon className="w-4 h-4" />
@@ -534,7 +514,6 @@ if (loading) {
               <span className="text-sm font-medium">Document Library</span>
               <span className="ml-auto text-xs font-medium tabular-nums text-emerald-400/60">{documentCount}</span>
             </Link>
-
             <Link href="/ncr" className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left mb-0.5 hover:bg-emerald-800/50 text-emerald-100 transition-all">
               <div className="w-8 h-8 rounded-md bg-emerald-800 text-emerald-300 flex items-center justify-center shrink-0">
                 <AlertIcon className="w-4 h-4" />
@@ -656,11 +635,7 @@ if (loading) {
                     <div key={cert.id} className="bg-white rounded-2xl border border-emerald-100 overflow-hidden hover:border-emerald-300 hover:shadow-lg transition-all group">
                       <div className="aspect-[4/5] bg-emerald-50 border-b border-emerald-100 relative overflow-hidden">
                         {previewUrls[cert.id] ? (
-                          <img
-                            src={previewUrls[cert.id]}
-                            alt={cert.name}
-                            className="w-full h-full object-contain p-4"
-                          />
+                          <img src={previewUrls[cert.id]} alt={cert.name} className="w-full h-full object-contain p-4" />
                         ) : (
                           <div className="w-full h-full flex flex-col items-center justify-center text-emerald-400">
                             <AwardIcon className="w-16 h-16 mb-2" />
@@ -678,7 +653,6 @@ if (loading) {
                           </button>
                         )}
                       </div>
-
                       <div className="p-5">
                         <div className="flex items-start gap-2 mb-2">
                           <div className="w-8 h-8 rounded-md bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
@@ -770,138 +744,51 @@ if (loading) {
                 <h3 className="text-lg font-bold text-emerald-950">Add ISO Certificate</h3>
                 <p className="text-sm text-emerald-700/70">Upload a new accredited certification</p>
               </div>
-              <button
-                type="button"
-                onClick={() => { setShowUpload(false); setUploadError('') }}
-                disabled={uploading}
-                className="p-1.5 rounded-md text-emerald-700 hover:bg-emerald-50 transition disabled:opacity-50"
-              >
+              <button type="button" onClick={() => { setShowUpload(false); setUploadError('') }} disabled={uploading} className="p-1.5 rounded-md text-emerald-700 hover:bg-emerald-50 transition disabled:opacity-50">
                 <XIcon className="w-5 h-5" />
               </button>
             </div>
-
             <div className="space-y-4">
               <div>
-                <label htmlFor="cert-name" className="block text-xs font-semibold text-emerald-800 uppercase tracking-wider mb-1.5">
-                  Certificate Name <span className="text-rose-600">*</span>
-                </label>
-                <input
-                  id="cert-name"
-                  type="text"
-                  value={certName}
-                  onChange={(e) => setCertName(e.target.value)}
-                  disabled={uploading}
-                  placeholder="e.g. ISO 9001:2015 — Quality Management"
-                  className="w-full px-3 py-2.5 bg-white border border-emerald-200 rounded-lg text-sm text-emerald-950 placeholder:text-emerald-700/40 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition"
-                />
+                <label htmlFor="cert-name" className="block text-xs font-semibold text-emerald-800 uppercase tracking-wider mb-1.5">Certificate Name <span className="text-rose-600">*</span></label>
+                <input id="cert-name" type="text" value={certName} onChange={(e) => setCertName(e.target.value)} disabled={uploading} placeholder="e.g. ISO 9001:2015 — Quality Management" className="w-full px-3 py-2.5 bg-white border border-emerald-200 rounded-lg text-sm text-emerald-950 placeholder:text-emerald-700/40 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition" />
               </div>
-
               <div>
-                <label htmlFor="cert-desc" className="block text-xs font-semibold text-emerald-800 uppercase tracking-wider mb-1.5">
-                  Short Description
-                </label>
-                <input
-                  id="cert-desc"
-                  type="text"
-                  value={certDesc}
-                  onChange={(e) => setCertDesc(e.target.value)}
-                  disabled={uploading}
-                  placeholder="e.g. Certified by Bureau Veritas"
-                  className="w-full px-3 py-2.5 bg-white border border-emerald-200 rounded-lg text-sm text-emerald-950 placeholder:text-emerald-700/40 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition"
-                />
+                <label htmlFor="cert-desc" className="block text-xs font-semibold text-emerald-800 uppercase tracking-wider mb-1.5">Short Description</label>
+                <input id="cert-desc" type="text" value={certDesc} onChange={(e) => setCertDesc(e.target.value)} disabled={uploading} placeholder="e.g. Certified by Bureau Veritas" className="w-full px-3 py-2.5 bg-white border border-emerald-200 rounded-lg text-sm text-emerald-950 placeholder:text-emerald-700/40 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition" />
               </div>
-
               <div>
-                <label className="block text-xs font-semibold text-emerald-800 uppercase tracking-wider mb-1.5">
-                  Certificate PDF <span className="text-rose-600">*</span>
-                </label>
+                <label className="block text-xs font-semibold text-emerald-800 uppercase tracking-wider mb-1.5">Certificate PDF <span className="text-rose-600">*</span></label>
                 <label htmlFor="pdf-input" className="block border-2 border-dashed border-emerald-200 hover:border-emerald-400 hover:bg-emerald-50/40 rounded-lg p-4 cursor-pointer transition">
-                  <input
-                    id="pdf-input"
-                    type="file"
-                    accept="application/pdf,.pdf"
-                    className="hidden"
-                    onChange={(e) => { setPdfFile(e.target.files?.[0] || null); setUploadError('') }}
-                    disabled={uploading}
-                  />
+                  <input id="pdf-input" type="file" accept="application/pdf,.pdf" className="hidden" onChange={(e) => { setPdfFile(e.target.files?.[0] || null); setUploadError('') }} disabled={uploading} />
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-md bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
-                      <FileIcon className="w-4 h-4" />
-                    </div>
+                    <div className="w-10 h-10 rounded-md bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0"><FileIcon className="w-4 h-4" /></div>
                     <div className="min-w-0 flex-1">
-                      <div className="text-sm font-medium text-emerald-950 truncate">
-                        {pdfFile ? pdfFile.name : 'Click to choose PDF'}
-                      </div>
-                      <div className="text-xs text-emerald-700/60">
-                        {pdfFile ? `${(pdfFile.size / 1024 / 1024).toFixed(2)} MB` : 'PDF file required'}
-                      </div>
+                      <div className="text-sm font-medium text-emerald-950 truncate">{pdfFile ? pdfFile.name : 'Click to choose PDF'}</div>
+                      <div className="text-xs text-emerald-700/60">{pdfFile ? `${(pdfFile.size / 1024 / 1024).toFixed(2)} MB` : 'PDF file required'}</div>
                     </div>
                   </div>
                 </label>
               </div>
-
               <div>
-                <label className="block text-xs font-semibold text-emerald-800 uppercase tracking-wider mb-1.5">
-                  Preview Image <span className="text-emerald-700/60 normal-case font-normal">(optional)</span>
-                </label>
+                <label className="block text-xs font-semibold text-emerald-800 uppercase tracking-wider mb-1.5">Preview Image <span className="text-emerald-700/60 normal-case font-normal">(optional)</span></label>
                 <label htmlFor="preview-input" className="block border-2 border-dashed border-emerald-200 hover:border-emerald-400 hover:bg-emerald-50/40 rounded-lg p-4 cursor-pointer transition">
-                  <input
-                    id="preview-input"
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp"
-                    className="hidden"
-                    onChange={(e) => { setPreviewFile(e.target.files?.[0] || null); setUploadError('') }}
-                    disabled={uploading}
-                  />
+                  <input id="preview-input" type="file" accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp" className="hidden" onChange={(e) => { setPreviewFile(e.target.files?.[0] || null); setUploadError('') }} disabled={uploading} />
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-md bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
-                      <ImageIcon className="w-4 h-4" />
-                    </div>
+                    <div className="w-10 h-10 rounded-md bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0"><ImageIcon className="w-4 h-4" /></div>
                     <div className="min-w-0 flex-1">
-                      <div className="text-sm font-medium text-emerald-950 truncate">
-                        {previewFile ? previewFile.name : 'Click to choose preview image'}
-                      </div>
-                      <div className="text-xs text-emerald-700/60">
-                        {previewFile ? `${(previewFile.size / 1024).toFixed(0)} KB` : 'PNG, JPG, or WEBP'}
-                      </div>
+                      <div className="text-sm font-medium text-emerald-950 truncate">{previewFile ? previewFile.name : 'Click to choose preview image'}</div>
+                      <div className="text-xs text-emerald-700/60">{previewFile ? `${(previewFile.size / 1024).toFixed(0)} KB` : 'PNG, JPG, or WEBP'}</div>
                     </div>
                   </div>
                 </label>
               </div>
-
-              {uploadError && (
-                <div className="bg-rose-50 border border-rose-200 text-rose-800 text-sm p-3 rounded-lg">
-                  {uploadError}
-                </div>
-              )}
+              {uploadError && <div className="bg-rose-50 border border-rose-200 text-rose-800 text-sm p-3 rounded-lg">{uploadError}</div>}
             </div>
-
             <div className="flex gap-2 justify-end mt-6 pt-4 border-t border-emerald-100">
-              <button
-                type="button"
-                onClick={() => { setShowUpload(false); setUploadError('') }}
-                disabled={uploading}
-                className="px-4 py-2 text-sm font-medium text-emerald-800 hover:bg-emerald-50 rounded-lg transition disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleUploadCert}
-                disabled={uploading || !certName.trim() || !pdfFile}
-                className="px-4 py-2 text-sm font-medium bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              >
-                {uploading ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Uploading…
-                  </>
-                ) : (
-                  <>
-                    <PlusIcon className="w-4 h-4" />
-                    Add Certificate
-                  </>
-                )}
+              <button type="button" onClick={() => { setShowUpload(false); setUploadError('') }} disabled={uploading} className="px-4 py-2 text-sm font-medium text-emerald-800 hover:bg-emerald-50 rounded-lg transition disabled:opacity-50">Cancel</button>
+              <button type="button" onClick={handleUploadCert} disabled={uploading || !certName.trim() || !pdfFile} className="px-4 py-2 text-sm font-medium bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+                {uploading ? (<><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Uploading…</>) : (<><PlusIcon className="w-4 h-4" />Add Certificate</>)}
               </button>
             </div>
           </div>
@@ -912,42 +799,16 @@ if (loading) {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-emerald-950/40 backdrop-blur-sm p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 border border-emerald-100">
             <div className="flex items-start gap-4 mb-4">
-              <div className="w-11 h-11 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
-                <TrashIcon className="w-5 h-5" />
-              </div>
+              <div className="w-11 h-11 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center shrink-0"><TrashIcon className="w-5 h-5" /></div>
               <div className="flex-1 min-w-0">
                 <h3 className="text-lg font-bold text-emerald-950 mb-1">Delete certificate?</h3>
-                <p className="text-sm text-emerald-700/80">
-                  This will permanently delete <span className="font-medium text-emerald-950">{deletingCert.name}</span> and its preview. This action cannot be undone.
-                </p>
+                <p className="text-sm text-emerald-700/80">This will permanently delete <span className="font-medium text-emerald-950">{deletingCert.name}</span> and its preview. This action cannot be undone.</p>
               </div>
             </div>
             <div className="flex gap-2 justify-end mt-6">
-              <button
-                type="button"
-                onClick={() => setDeletingCert(null)}
-                disabled={deleting}
-                className="px-4 py-2 text-sm font-medium text-emerald-800 hover:bg-emerald-50 rounded-lg transition disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleDeleteCert}
-                disabled={deleting}
-                className="px-4 py-2 text-sm font-medium bg-rose-600 hover:bg-rose-700 text-white rounded-lg transition shadow-sm disabled:opacity-50 flex items-center gap-2"
-              >
-                {deleting ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Deleting…
-                  </>
-                ) : (
-                  <>
-                    <TrashIcon className="w-4 h-4" />
-                    Delete
-                  </>
-                )}
+              <button type="button" onClick={() => setDeletingCert(null)} disabled={deleting} className="px-4 py-2 text-sm font-medium text-emerald-800 hover:bg-emerald-50 rounded-lg transition disabled:opacity-50">Cancel</button>
+              <button type="button" onClick={handleDeleteCert} disabled={deleting} className="px-4 py-2 text-sm font-medium bg-rose-600 hover:bg-rose-700 text-white rounded-lg transition shadow-sm disabled:opacity-50 flex items-center gap-2">
+                {deleting ? (<><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Deleting…</>) : (<><TrashIcon className="w-4 h-4" />Delete</>)}
               </button>
             </div>
           </div>
