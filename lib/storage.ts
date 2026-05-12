@@ -1,4 +1,5 @@
-import { supabase } from './supabase'
+import { createClient } from './supabase'
+const supabase = createClient()
 
 /**
  * Returns existing file names in a documents bucket path
