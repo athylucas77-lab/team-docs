@@ -104,7 +104,6 @@ const ShareIcon = ({ className = '' }: { className?: string }) => (
   </svg>
 )
 
-// ─── Constants ────────────────────────────────────────────────────────────────
 const TIERS = [
   { id: 'tier-1-policies', shortLabel: 'Policies', label: 'Tier 1 - Policies', Icon: ShieldIcon },
   { id: 'tier-2-ims-manual', shortLabel: 'IMS Manual, Plan, Document List', label: 'Tier 2 - IMS Manual, Plan, Document List', Icon: BookIcon },
@@ -113,7 +112,6 @@ const TIERS = [
   { id: 'tier-5-forms', shortLabel: 'Forms', label: 'Tier 5 - Forms', Icon: FormIcon },
 ]
 
-// ─── Types ────────────────────────────────────────────────────────────────────
 interface DocumentFile {
   name: string
   id: string | null
@@ -139,130 +137,8 @@ interface TierData {
   allDocuments: DocumentFile[]
 }
 
-interface FolderAccess {
-  folder_path: string
-  permission: 'view' | 'edit'
-}
-
 const toLabel = (slug: string) =>
   slug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
-
-// ─── Folder Share Panel Component ─────────────────────────────────────────────
-const FolderSharePanel = ({
-  folderPath,
-  onClose,
-}: {
-  folderPath: string
-  onClose: () => void
-}) => {
-  const [email, setEmail] = useState('')
-  const [permission, setPermission] = useState<'view' | 'edit'>('view')
-  const [loading, setLoading] = useState(false)
-  const [message, setMessage] = useState('')
-
-  const handleInvite = async () => {
-    if (!email) return
-    setLoading(true)
-    setMessage('')
-
-    try {
-      // Try to invite new user first
-      const res = await fetch('/api/invite', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, page: '/documents', permission: 'view' }),
-      })
-      const data = await res.json()
-
-      // Get user profile
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('email', email)
-        .single()
-
-      if (!profile) {
-        setMessage('User not found.')
-        setLoading(false)
-        return
-      }
-
-      // Grant folder-level access
-      const { error } = await supabase
-        .from('folder_access')
-        .upsert({
-          folder_path: folderPath,
-          user_id: profile.id,
-          permission,
-        }, { onConflict: 'folder_path,user_id' })
-
-      // Also grant page access
-      await supabase
-        .from('page_access')
-        .upsert({
-          page: '/documents',
-          user_id: profile.id,
-          permission: 'view',
-        }, { onConflict: 'page,user_id' })
-
-      if (error) {
-        setMessage('Something went wrong.')
-      } else {
-        setMessage(res.ok ? `Invite sent to ${email}!` : `Access granted to ${email}!`)
-        setEmail('')
-      }
-    } catch {
-      setMessage('Something went wrong.')
-    }
-    setLoading(false)
-  }
-
-  return (
-    <div className="absolute right-0 top-8 w-80 bg-white border border-emerald-100 rounded-xl shadow-xl z-50 p-5">
-      <div className="flex items-center justify-between mb-4">
-        <span className="font-medium text-emerald-950 text-sm">Share folder access</span>
-        <button onClick={onClose} className="text-emerald-400 hover:text-emerald-700"><XIcon className="w-4 h-4" /></button>
-      </div>
-      <p className="text-xs text-emerald-700/60 mb-1">Folder: <span className="font-medium text-emerald-800">{folderPath}</span></p>
-      <p className="text-xs text-emerald-700/60 mb-3">Invited users will only see this folder.</p>
-      <input
-        type="email"
-        placeholder="name@email.com"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        className="w-full px-3 py-2 text-sm border border-emerald-200 rounded-lg bg-emerald-50 text-emerald-950 placeholder:text-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 mb-2"
-      />
-      <div className="flex gap-2 mb-2">
-        <select
-          value={permission}
-          onChange={(e) => setPermission(e.target.value as 'view' | 'edit')}
-          className="flex-1 px-3 py-2 text-sm border border-emerald-200 rounded-lg bg-emerald-50 text-emerald-950"
-        >
-          <option value="view">Can view</option>
-          <option value="edit">Can edit</option>
-        </select>
-        <button
-          onClick={handleInvite}
-          disabled={!email || loading}
-          className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-sm rounded-lg transition disabled:opacity-50"
-        >
-          {loading ? '...' : 'Invite'}
-        </button>
-      </div>
-      {message && (
-        <p className={`text-xs mt-2 ${message.includes('sent') || message.includes('granted') ? 'text-emerald-600' : 'text-rose-600'}`}>
-          {message}
-        </p>
-      )}
-      <div className="mt-3 p-2 bg-emerald-50 rounded-lg">
-        <p className="text-[11px] text-emerald-700/70">
-          <strong>Can view</strong> — view & download files<br />
-          <strong>Can edit</strong> — view, upload, create subfolders & delete own folders
-        </p>
-      </div>
-    </div>
-  )
-}
 
 export default function DocumentsPage() {
   const [tieredDocuments, setTieredDocuments] = useState<TierData[]>([])
@@ -278,35 +154,28 @@ export default function DocumentsPage() {
   const [activeTierId, setActiveTierId] = useState(TIERS[0].id)
   const [activeSubfolder, setActiveSubfolder] = useState<string | null>(null)
   const [expandedTiers, setExpandedTiers] = useState<Set<string>>(new Set([TIERS[0].id]))
-
   const [query, setQuery] = useState('')
 
   const [deletingDoc, setDeletingDoc] = useState<{ tierId: string; fileName: string; subfolder?: string } | null>(null)
   const [deleting, setDeleting] = useState(false)
-
-  const [deletingFolder, setDeletingFolder] = useState<{
-    tierId: string
-    folderSlug: string
-    folderLabel: string
-  } | null>(null)
+  const [deletingFolder, setDeletingFolder] = useState<{ tierId: string; folderSlug: string; folderLabel: string } | null>(null)
   const [deletingFolderBusy, setDeletingFolderBusy] = useState(false)
-
   const [showCreateFolder, setShowCreateFolder] = useState(false)
   const [newFolderName, setNewFolderName] = useState('')
   const [creatingFolder, setCreatingFolder] = useState(false)
   const [folderError, setFolderError] = useState('')
 
-  // Share state — page level
+  // Single share panel state
   const [showSharePanel, setShowSharePanel] = useState(false)
+  const [shareTab, setShareTab] = useState<'page' | 'folder' | 'document'>('page')
   const [shareEmail, setShareEmail] = useState('')
   const [sharePermission, setSharePermission] = useState<'view' | 'edit'>('view')
   const [shareLinkPermission, setShareLinkPermission] = useState<'view' | 'edit'>('view')
   const [shareLink, setShareLink] = useState('')
   const [shareMessage, setShareMessage] = useState('')
   const [shareLoading, setShareLoading] = useState(false)
-
-  // Folder share state
-  const [sharingFolder, setSharingFolder] = useState<string | null>(null)
+  const [selectedShareFolder, setSelectedShareFolder] = useState('')
+  const [selectedShareDoc, setSelectedShareDoc] = useState('')
 
   const router = useRouter()
   const loadingCanvasRef = useRef<HTMLCanvasElement>(null)
@@ -319,17 +188,13 @@ export default function DocumentsPage() {
     if (!canvas) return
     const ctx = canvas.getContext('2d')
     if (!ctx) return
-
     let animationId: number
     let particles: Array<{ x: number; y: number; vx: number; vy: number; radius: number }> = []
-
     const resizeCanvas = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight }
     const initParticles = () => {
       const count = Math.min(80, Math.floor((canvas.width * canvas.height) / 20000))
       particles = []
-      for (let i = 0; i < count; i++) {
-        particles.push({ x: Math.random() * canvas.width, y: Math.random() * canvas.height, vx: (Math.random() - 0.5) * 0.4, vy: (Math.random() - 0.5) * 0.4, radius: Math.random() * 1.5 + 0.5 })
-      }
+      for (let i = 0; i < count; i++) particles.push({ x: Math.random() * canvas.width, y: Math.random() * canvas.height, vx: (Math.random() - 0.5) * 0.4, vy: (Math.random() - 0.5) * 0.4, radius: Math.random() * 1.5 + 0.5 })
     }
     const animate = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height)
@@ -343,8 +208,7 @@ export default function DocumentsPage() {
       const maxDistance = 140
       for (let i = 0; i < particles.length; i++) {
         for (let j = i + 1; j < particles.length; j++) {
-          const dx = particles[i].x - particles[j].x
-          const dy = particles[i].y - particles[j].y
+          const dx = particles[i].x - particles[j].x; const dy = particles[i].y - particles[j].y
           const distance = Math.sqrt(dx * dx + dy * dy)
           if (distance < maxDistance) {
             const opacity = (1 - distance / maxDistance) * 0.3
@@ -365,32 +229,20 @@ export default function DocumentsPage() {
   const init = async () => {
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) { await supabase.auth.signOut(); router.push('/login'); return }
-
     setUserEmail(user.email || '')
     setUserId(user.id)
-
     const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
     const role = profile?.role || 'user'
     const admin = role === 'admin'
     setIsAdmin(admin)
-
     if (!admin) {
       const { data: ed } = await supabase.from('ncr_editors').select('email').eq('email', user.email).maybeSingle()
       setIsEditor(!!ed)
-
-      // Load folder access for non-admins
-      const { data: folderAccessRows } = await supabase
-        .from('folder_access')
-        .select('folder_path, permission')
-        .eq('user_id', user.id)
-
+      const { data: folderAccessRows } = await supabase.from('folder_access').select('folder_path, permission').eq('user_id', user.id)
       const map = new Map<string, 'view' | 'edit'>()
-      for (const row of folderAccessRows || []) {
-        map.set(row.folder_path, row.permission)
-      }
+      for (const row of folderAccessRows || []) map.set(row.folder_path, row.permission)
       setFolderAccessMap(map)
     }
-
     await loadDocuments()
   }
 
@@ -398,10 +250,8 @@ export default function DocumentsPage() {
     const { data: ownershipRows } = await supabase.from('folder_ownership').select('tier_id, folder_slug, created_by')
     const ownershipMap = new Map<string, string>()
     for (const row of ownershipRows || []) ownershipMap.set(`${row.tier_id}::${row.folder_slug}`, row.created_by)
-
     const tiered: TierData[] = []
     let total = 0
-
     for (const tier of TIERS) {
       const { data: rootItems, error: rootErr } = await supabase.storage.from('documents').list(tier.id, { limit: 200, sortBy: { column: 'name', order: 'asc' } })
       if (rootErr) console.error(`Error listing ${tier.id}:`, rootErr.message)
@@ -424,22 +274,12 @@ export default function DocumentsPage() {
     setLoading(false)
   }
 
-  // Get folder permission for current user
   const getFolderPermission = (tierId: string, folderSlug: string): 'view' | 'edit' | null => {
     if (isAdmin) return 'edit'
-    const key = `${tierId}/${folderSlug}`
-    return folderAccessMap.get(key) || null
+    return folderAccessMap.get(`${tierId}/${folderSlug}`) || null
   }
-
-  const canEditFolder = (tierId: string, folderSlug: string) => {
-    if (isAdmin) return true
-    return getFolderPermission(tierId, folderSlug) === 'edit'
-  }
-
-  const canViewFolder = (tierId: string, folderSlug: string) => {
-    if (isAdmin) return true
-    return folderAccessMap.has(`${tierId}/${folderSlug}`)
-  }
+  const canEditFolder = (tierId: string, folderSlug: string) => isAdmin || getFolderPermission(tierId, folderSlug) === 'edit'
+  const canViewFolder = (tierId: string, folderSlug: string) => isAdmin || folderAccessMap.has(`${tierId}/${folderSlug}`)
 
   const handleCreateFolder = async () => {
     if (!newFolderName.trim()) { setFolderError('Please enter a folder name.'); return }
@@ -499,33 +339,52 @@ export default function DocumentsPage() {
     if (!shareEmail) return
     setShareLoading(true); setShareMessage('')
     try {
-      const res = await fetch('/api/invite', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: shareEmail, page: '/documents', permission: sharePermission }),
-      })
-      const data = await res.json()
-      if (res.ok) {
-        setShareMessage(`Invite sent to ${shareEmail}!`)
-        setShareEmail('')
-      } else if (data.error?.includes('already been registered')) {
+      if (shareTab === 'page') {
+        const res = await fetch('/api/invite', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: shareEmail, page: '/documents', permission: sharePermission }),
+        })
+        const data = await res.json()
+        if (res.ok) { setShareMessage(`Invite sent to ${shareEmail}!`); setShareEmail('') }
+        else if (data.error?.includes('already been registered')) {
+          const { data: profile } = await supabase.from('profiles').select('id').eq('email', shareEmail).single()
+          if (!profile) { setShareMessage('User not found.'); setShareLoading(false); return }
+          const { error } = await supabase.from('page_access').upsert({ page: '/documents', user_id: profile.id, permission: sharePermission }, { onConflict: 'page,user_id' })
+          setShareMessage(error ? 'Something went wrong.' : `Access granted to ${shareEmail}!`)
+          if (!error) setShareEmail('')
+        } else { setShareMessage(data.error || 'Something went wrong.') }
+      } else if (shareTab === 'folder') {
+        if (!selectedShareFolder) { setShareMessage('Please select a folder.'); setShareLoading(false); return }
+        const res = await fetch('/api/invite', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: shareEmail, page: '/documents', permission: 'view' }),
+        })
+        await res.json()
         const { data: profile } = await supabase.from('profiles').select('id').eq('email', shareEmail).single()
-        if (!profile) { setShareMessage('User not found.'); setShareLoading(false); return }
-        const { error } = await supabase.from('page_access').upsert({ page: '/documents', user_id: profile.id, permission: sharePermission }, { onConflict: 'page,user_id' })
-        setShareMessage(error ? 'Something went wrong.' : `Access granted to ${shareEmail}!`)
+        if (!profile) { setShareMessage('User not found. Try sending invite first.'); setShareLoading(false); return }
+        await supabase.from('page_access').upsert({ page: '/documents', user_id: profile.id, permission: 'view' }, { onConflict: 'page,user_id' })
+        const { error } = await supabase.from('folder_access').upsert({ folder_path: selectedShareFolder, user_id: profile.id, permission: sharePermission }, { onConflict: 'folder_path,user_id' })
+        setShareMessage(error ? 'Something went wrong.' : `Folder access granted to ${shareEmail}!`)
         if (!error) setShareEmail('')
-      } else {
-        setShareMessage(data.error || 'Something went wrong.')
       }
     } catch { setShareMessage('Something went wrong.') }
     setShareLoading(false)
   }
 
   const handleGenerateLink = async () => {
-    setShareLoading(true)
-    const token = crypto.randomUUID()
-    const { error } = await supabase.from('page_access').insert({ page: '/documents', user_id: null, permission: shareLinkPermission, share_token: token })
-    if (!error) setShareLink(`${window.location.origin}/share/${token}`)
+    setShareLoading(true); setShareMessage('')
+    if (shareTab === 'document') {
+      if (!selectedShareDoc) { setShareMessage('Please select a document.'); setShareLoading(false); return }
+      const { data, error } = await supabase.storage.from('documents').createSignedUrl(selectedShareDoc, 60 * 60 * 24 * 7)
+      if (!error && data?.signedUrl) setShareLink(data.signedUrl)
+      else setShareMessage('Could not generate link.')
+    } else {
+      const token = crypto.randomUUID()
+      const { error } = await supabase.from('page_access').insert({ page: '/documents', user_id: null, permission: shareLinkPermission, share_token: token })
+      if (!error) setShareLink(`${window.location.origin}/share/${token}`)
+    }
     setShareLoading(false)
   }
 
@@ -581,40 +440,35 @@ export default function DocumentsPage() {
   }
 
   const current = tieredDocuments.find((t) => t.tierId === activeTierId)
-
-  // Determine what folders the user can see
-  const visibleSubfolders = current?.subfolders.filter(sf => {
-    if (isAdmin) return true
-    return canViewFolder(activeTierId, sf.name)
-  }) || []
-
-  // Can manage folders = admin OR has edit permission on active folder
+  const visibleSubfolders = current?.subfolders.filter(sf => isAdmin || canViewFolder(activeTierId, sf.name)) || []
   const canManageFolders = isAdmin || (activeSubfolder && activeSubfolder !== '__root__' && canEditFolder(activeTierId, activeSubfolder))
 
   let visibleDocs: DocumentFile[] = []
   if (current) {
-    if (activeSubfolder === null) {
-      // Show all docs from visible subfolders only
-      visibleDocs = isAdmin
-        ? current.allDocuments
-        : [...current.rootDocuments, ...visibleSubfolders.flatMap(sf => sf.documents)]
-    } else if (activeSubfolder === '__root__') {
-      visibleDocs = current.rootDocuments
-    } else {
-      visibleDocs = current.subfolders.find((s) => s.name === activeSubfolder)?.documents || []
-    }
+    if (activeSubfolder === null) visibleDocs = isAdmin ? current.allDocuments : [...current.rootDocuments, ...visibleSubfolders.flatMap(sf => sf.documents)]
+    else if (activeSubfolder === '__root__') visibleDocs = current.rootDocuments
+    else visibleDocs = current.subfolders.find((s) => s.name === activeSubfolder)?.documents || []
   }
 
   const hasSearch = query.trim().length > 0
   const filteredDocs = hasSearch ? visibleDocs.filter((d) => d.name.toLowerCase().includes(query.toLowerCase())) : visibleDocs
-  const showFolderCol = activeSubfolder === null && (visibleSubfolders.length ?? 0) > 0
+  const showFolderCol = activeSubfolder === null && visibleSubfolders.length > 0
   const currentIndex = TIERS.findIndex((t) => t.id === activeTierId) + 1
   const activeSubfolderLabel = activeSubfolder === null ? null : activeSubfolder === '__root__' ? 'Root Files' : current?.subfolders.find((s) => s.name === activeSubfolder)?.label
   const activeSubfolderData = activeSubfolder && activeSubfolder !== '__root__' ? current?.subfolders.find((s) => s.name === activeSubfolder) : null
-  const canDeleteActiveFolder = !!activeSubfolderData && (isAdmin || (activeSubfolderData.createdBy === userId))
+  const canDeleteActiveFolder = !!activeSubfolderData && (isAdmin || activeSubfolderData.createdBy === userId)
   const activeFolderPermission = activeSubfolder && activeSubfolder !== '__root__' ? getFolderPermission(activeTierId, activeSubfolder) : null
   const accessLabel = isAdmin ? 'Full access' : activeFolderPermission === 'edit' ? 'Edit access' : activeFolderPermission === 'view' ? 'View only' : isEditor ? 'Edit access' : 'View only'
   const roleBadge = isAdmin ? 'Admin' : isEditor ? 'Editor' : 'Viewer'
+
+  // All folders and docs for share dropdowns
+  const allFolderOptions = tieredDocuments.flatMap(tier =>
+    tier.subfolders.map(sf => ({ value: `${tier.tierId}/${sf.name}`, label: `${tier.shortLabel} / ${sf.label}` }))
+  )
+  const allDocOptions = tieredDocuments.flatMap(tier => [
+    ...tier.rootDocuments.map(doc => ({ value: `${tier.tierId}/${doc.name}`, label: `${tier.shortLabel} / ${doc.name}` })),
+    ...tier.subfolders.flatMap(sf => sf.documents.map(doc => ({ value: `${tier.tierId}/${sf.name}/${doc.name}`, label: `${tier.shortLabel} / ${sf.label} / ${doc.name}` })))
+  ])
 
   return (
     <div className="min-h-screen bg-emerald-50/40 text-emerald-950" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
@@ -651,7 +505,6 @@ export default function DocumentsPage() {
               const visibleSfs = tier.subfolders.filter(sf => isAdmin || canViewFolder(tier.tierId, sf.name))
               const hasSubfolders = visibleSfs.length > 0
               const hasRoot = tier.rootDocuments.length > 0
-
               return (
                 <div key={tier.tierId} className="mb-0.5">
                   <button
@@ -687,7 +540,6 @@ export default function DocumentsPage() {
                       {visibleSfs.map((sf) => {
                         const canDeleteThisFolder = isAdmin || sf.createdBy === userId
                         const folderPerm = getFolderPermission(tier.tierId, sf.name)
-                        const folderPath = `${tier.tierId}/${sf.name}`
                         return (
                           <div key={sf.name} className="flex items-center gap-1">
                             <button onClick={() => setActiveSubfolder(sf.name)} className={`flex-1 flex items-center gap-2 px-2.5 py-1.5 rounded-md text-left text-xs transition-all ${activeSubfolder === sf.name ? 'bg-emerald-800/80 text-white font-medium' : 'text-emerald-300 hover:bg-emerald-800/40 hover:text-white'}`}>
@@ -700,24 +552,6 @@ export default function DocumentsPage() {
                               )}
                               <span className="tabular-nums text-[10px] text-emerald-400/70">{sf.documents.length}</span>
                             </button>
-                            {/* Share button — Admin only */}
-                            {isAdmin && (
-                              <div className="relative">
-                                <button
-                                  onClick={() => setSharingFolder(sharingFolder === folderPath ? null : folderPath)}
-                                  className="p-1 rounded text-emerald-400 hover:text-emerald-100 hover:bg-emerald-800/60 transition shrink-0"
-                                  title="Share folder"
-                                >
-                                  <ShareIcon className="w-3 h-3" />
-                                </button>
-                                {sharingFolder === folderPath && (
-                                  <FolderSharePanel
-                                    folderPath={folderPath}
-                                    onClose={() => setSharingFolder(null)}
-                                  />
-                                )}
-                              </div>
-                            )}
                             {canDeleteThisFolder && (
                               <button onClick={() => setDeletingFolder({ tierId: tier.tierId, folderSlug: sf.name, folderLabel: sf.label })} className="p-1 rounded text-emerald-500 hover:text-rose-400 hover:bg-emerald-800/60 transition shrink-0" title="Delete folder">
                                 <TrashIcon className="w-3 h-3" />
@@ -731,7 +565,6 @@ export default function DocumentsPage() {
                           <PlusIcon className="w-3 h-3 shrink-0" /><span>New Folder</span>
                         </button>
                       )}
-                      {/* Non-admin with edit permission can also create folders */}
                       {!isAdmin && activeSubfolder && canEditFolder(activeTierId, activeSubfolder) && (
                         <button onClick={() => { setShowCreateFolder(true); setFolderError(''); setNewFolderName('') }} className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-left text-xs text-emerald-400 hover:text-emerald-100 hover:bg-emerald-800/40 transition-all border border-dashed border-emerald-800 hover:border-emerald-700 mt-1.5">
                           <PlusIcon className="w-3 h-3 shrink-0" /><span>New Folder</span>
@@ -768,7 +601,6 @@ export default function DocumentsPage() {
             <img src="/operon-logo-grey.png" alt="" aria-hidden="true" className="w-[700px] max-w-[80%] opacity-[0.05]" />
           </div>
 
-          {/* Header */}
           <header className="bg-white border-b border-emerald-100 px-8 py-4 relative">
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-2 text-sm text-emerald-700/70 min-w-0">
@@ -784,47 +616,15 @@ export default function DocumentsPage() {
                 {/* Search bar */}
                 <div className="relative">
                   <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-400" />
-                  <input
-                    type="text"
-                    placeholder="Search documents…"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    className="pl-9 pr-8 py-2 text-sm bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-950 placeholder:text-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition w-52"
-                  />
-                  {query && (
-                    <button onClick={() => setQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-emerald-400 hover:text-emerald-700">
-                      <XIcon className="w-3.5 h-3.5" />
-                    </button>
-                  )}
+                  <input type="text" placeholder="Search documents…" value={query} onChange={(e) => setQuery(e.target.value)} className="pl-9 pr-8 py-2 text-sm bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-950 placeholder:text-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition w-52" />
+                  {query && <button onClick={() => setQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-emerald-400 hover:text-emerald-700"><XIcon className="w-3.5 h-3.5" /></button>}
                 </div>
 
-                {/* Folder share button in header — shown when a folder is selected */}
-                {isAdmin && activeSubfolder && activeSubfolder !== '__root__' && activeSubfolderData && (
-                  <div className="relative">
-                    <button
-                      onClick={() => {
-                        const fp = `${activeTierId}/${activeSubfolder}`
-                        setSharingFolder(sharingFolder === fp ? null : fp)
-                      }}
-                      className="flex items-center gap-2 px-3 py-2 bg-white border border-emerald-200 hover:bg-emerald-50 text-emerald-800 text-sm font-medium rounded-lg transition shadow-sm"
-                    >
-                      <ShareIcon className="w-4 h-4" />
-                      Share Folder
-                    </button>
-                    {sharingFolder === `${activeTierId}/${activeSubfolder}` && (
-                      <FolderSharePanel
-                        folderPath={`${activeTierId}/${activeSubfolder}`}
-                        onClose={() => setSharingFolder(null)}
-                      />
-                    )}
-                  </div>
-                )}
-
-                {/* Page-level Share button — Admin only */}
+                {/* Single Share button — Admin only */}
                 {isAdmin && (
                   <div className="relative">
                     <button
-                      onClick={() => { setShowSharePanel(!showSharePanel); setShareMessage(''); setShareLink('') }}
+                      onClick={() => { setShowSharePanel(!showSharePanel); setShareMessage(''); setShareLink(''); setShareTab('page') }}
                       className="flex items-center gap-2 px-3 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-medium rounded-lg transition shadow-sm"
                     >
                       <ShareIcon className="w-4 h-4" />
@@ -832,40 +632,106 @@ export default function DocumentsPage() {
                     </button>
 
                     {showSharePanel && (
-                      <div className="absolute right-0 top-11 w-80 bg-white border border-emerald-100 rounded-xl shadow-xl z-50 p-5">
+                      <div className="absolute right-0 top-11 w-96 bg-white border border-emerald-100 rounded-xl shadow-xl z-50 p-5 max-h-[80vh] overflow-y-auto">
                         <div className="flex items-center justify-between mb-4">
-                          <span className="font-medium text-emerald-950 text-sm">Grant page access</span>
+                          <span className="font-medium text-emerald-950 text-sm">Share access</span>
                           <button onClick={() => setShowSharePanel(false)} className="text-emerald-400 hover:text-emerald-700"><XIcon className="w-4 h-4" /></button>
                         </div>
-                        <p className="text-xs text-emerald-700/60 mb-3">This gives access to the entire Documents page.</p>
-                        <p className="text-xs text-emerald-700/60 mb-2">Invite by email</p>
-                        <input type="email" placeholder="name@email.com" value={shareEmail} onChange={(e) => setShareEmail(e.target.value)} className="w-full px-3 py-2 text-sm border border-emerald-200 rounded-lg bg-emerald-50 text-emerald-950 placeholder:text-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 mb-2" />
-                        <div className="flex gap-2 mb-3">
-                          <select value={sharePermission} onChange={(e) => setSharePermission(e.target.value as 'view' | 'edit')} className="flex-1 px-3 py-2 text-sm border border-emerald-200 rounded-lg bg-emerald-50 text-emerald-950">
-                            <option value="view">Can view</option>
-                            <option value="edit">Can edit</option>
-                          </select>
-                          <button onClick={handleShareByEmail} disabled={!shareEmail || shareLoading} className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-sm rounded-lg transition disabled:opacity-50">
-                            {shareLoading ? '...' : 'Invite'}
-                          </button>
+
+                        {/* Tabs */}
+                        <div className="flex gap-1 mb-4 bg-emerald-50 rounded-lg p-1">
+                          {(['page', 'folder', 'document'] as const).map((tab) => (
+                            <button key={tab} onClick={() => { setShareTab(tab); setShareMessage(''); setShareLink('') }} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition ${shareTab === tab ? 'bg-white text-emerald-800 shadow-sm' : 'text-emerald-600 hover:text-emerald-800'}`}>
+                              {tab === 'page' ? '🌐 Page' : tab === 'folder' ? '📁 Folder' : '📄 Document'}
+                            </button>
+                          ))}
                         </div>
-                        <hr className="border-emerald-100 mb-3" />
-                        <p className="text-xs text-emerald-700/60 mb-2">Share via link</p>
-                        <div className="flex gap-2 mb-2">
-                          <select value={shareLinkPermission} onChange={(e) => setShareLinkPermission(e.target.value as 'view' | 'edit')} className="flex-1 px-3 py-2 text-sm border border-emerald-200 rounded-lg bg-emerald-50 text-emerald-950">
-                            <option value="view">Can view</option>
-                            <option value="edit">Can edit</option>
-                          </select>
-                          <button onClick={handleGenerateLink} disabled={shareLoading} className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-sm rounded-lg transition disabled:opacity-50">Generate</button>
-                        </div>
-                        {shareLink && (
-                          <div className="flex gap-2">
-                            <input readOnly value={shareLink} className="flex-1 px-3 py-2 text-xs border border-emerald-200 rounded-lg bg-emerald-50 text-emerald-700 truncate" />
-                            <button onClick={() => { navigator.clipboard.writeText(shareLink); setShareMessage('Copied!') }} className="px-3 py-2 border border-emerald-200 rounded-lg text-sm text-emerald-700 hover:bg-emerald-50">Copy</button>
+
+                        {/* Page Tab */}
+                        {shareTab === 'page' && (
+                          <div className="space-y-3">
+                            <p className="text-xs text-emerald-700/60">Share the entire Documents page. User can see all folders you give them access to.</p>
+                            <p className="text-xs font-medium text-emerald-800">Invite by email</p>
+                            <input type="email" placeholder="name@email.com" value={shareEmail} onChange={(e) => setShareEmail(e.target.value)} className="w-full px-3 py-2 text-sm border border-emerald-200 rounded-lg bg-emerald-50 text-emerald-950 placeholder:text-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30" />
+                            <div className="flex gap-2">
+                              <select value={sharePermission} onChange={(e) => setSharePermission(e.target.value as 'view' | 'edit')} className="flex-1 px-3 py-2 text-sm border border-emerald-200 rounded-lg bg-emerald-50 text-emerald-950">
+                                <option value="view">Can view</option>
+                                <option value="edit">Can edit</option>
+                              </select>
+                              <button onClick={handleShareByEmail} disabled={!shareEmail || shareLoading} className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-sm rounded-lg transition disabled:opacity-50">{shareLoading ? '...' : 'Invite'}</button>
+                            </div>
+                            <hr className="border-emerald-100" />
+                            <p className="text-xs font-medium text-emerald-800">Share via link</p>
+                            <div className="flex gap-2">
+                              <select value={shareLinkPermission} onChange={(e) => setShareLinkPermission(e.target.value as 'view' | 'edit')} className="flex-1 px-3 py-2 text-sm border border-emerald-200 rounded-lg bg-emerald-50 text-emerald-950">
+                                <option value="view">Can view</option>
+                                <option value="edit">Can edit</option>
+                              </select>
+                              <button onClick={handleGenerateLink} disabled={shareLoading} className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-sm rounded-lg transition disabled:opacity-50">Generate</button>
+                            </div>
+                            {shareLink && (
+                              <div className="flex gap-2">
+                                <input readOnly value={shareLink} className="flex-1 px-3 py-2 text-xs border border-emerald-200 rounded-lg bg-emerald-50 text-emerald-700 truncate" />
+                                <button onClick={() => { navigator.clipboard.writeText(shareLink); setShareMessage('Copied!') }} className="px-3 py-2 border border-emerald-200 rounded-lg text-sm text-emerald-700 hover:bg-emerald-50">Copy</button>
+                              </div>
+                            )}
                           </div>
                         )}
+
+                        {/* Folder Tab */}
+                        {shareTab === 'folder' && (
+                          <div className="space-y-3">
+                            <p className="text-xs text-emerald-700/60">Share a specific folder. User can only see that folder's contents.</p>
+                            <div>
+                              <p className="text-xs font-medium text-emerald-800 mb-1">Select folder</p>
+                              <select value={selectedShareFolder} onChange={(e) => setSelectedShareFolder(e.target.value)} className="w-full px-3 py-2 text-sm border border-emerald-200 rounded-lg bg-emerald-50 text-emerald-950">
+                                <option value="">— Choose a folder —</option>
+                                {allFolderOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                              </select>
+                            </div>
+                            <p className="text-xs font-medium text-emerald-800">Invite by email</p>
+                            <input type="email" placeholder="name@email.com" value={shareEmail} onChange={(e) => setShareEmail(e.target.value)} className="w-full px-3 py-2 text-sm border border-emerald-200 rounded-lg bg-emerald-50 text-emerald-950 placeholder:text-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30" />
+                            <div className="flex gap-2">
+                              <select value={sharePermission} onChange={(e) => setSharePermission(e.target.value as 'view' | 'edit')} className="flex-1 px-3 py-2 text-sm border border-emerald-200 rounded-lg bg-emerald-50 text-emerald-950">
+                                <option value="view">Can view</option>
+                                <option value="edit">Can edit</option>
+                              </select>
+                              <button onClick={handleShareByEmail} disabled={!shareEmail || !selectedShareFolder || shareLoading} className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-sm rounded-lg transition disabled:opacity-50">{shareLoading ? '...' : 'Invite'}</button>
+                            </div>
+                            <div className="p-2 bg-emerald-50 rounded-lg">
+                              <p className="text-[11px] text-emerald-700/70"><strong>Can view</strong> — view & download only<br /><strong>Can edit</strong> — upload, create subfolders & delete own folders</p>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Document Tab */}
+                        {shareTab === 'document' && (
+                          <div className="space-y-3">
+                            <p className="text-xs text-emerald-700/60">Generate a direct download link for a single document. Link expires in 7 days.</p>
+                            <div>
+                              <p className="text-xs font-medium text-emerald-800 mb-1">Select document</p>
+                              <select value={selectedShareDoc} onChange={(e) => setSelectedShareDoc(e.target.value)} className="w-full px-3 py-2 text-sm border border-emerald-200 rounded-lg bg-emerald-50 text-emerald-950">
+                                <option value="">— Choose a document —</option>
+                                {allDocOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                              </select>
+                            </div>
+                            <button onClick={handleGenerateLink} disabled={!selectedShareDoc || shareLoading} className="w-full px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-sm rounded-lg transition disabled:opacity-50">
+                              {shareLoading ? 'Generating...' : 'Generate Download Link'}
+                            </button>
+                            {shareLink && (
+                              <div className="space-y-2">
+                                <div className="flex gap-2">
+                                  <input readOnly value={shareLink} className="flex-1 px-3 py-2 text-xs border border-emerald-200 rounded-lg bg-emerald-50 text-emerald-700 truncate" />
+                                  <button onClick={() => { navigator.clipboard.writeText(shareLink); setShareMessage('Copied!') }} className="px-3 py-2 border border-emerald-200 rounded-lg text-sm text-emerald-700 hover:bg-emerald-50">Copy</button>
+                                </div>
+                                <p className="text-[11px] text-emerald-600">✓ Link valid for 7 days. Anyone with this link can download the file.</p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
                         {shareMessage && (
-                          <p className={`text-xs mt-2 ${shareMessage.includes('granted') || shareMessage.includes('Copied') || shareMessage.includes('sent') ? 'text-emerald-600' : 'text-rose-600'}`}>{shareMessage}</p>
+                          <p className={`text-xs mt-3 ${shareMessage.includes('granted') || shareMessage.includes('Copied') || shareMessage.includes('sent') ? 'text-emerald-600' : 'text-rose-600'}`}>{shareMessage}</p>
                         )}
                       </div>
                     )}
@@ -893,7 +759,6 @@ export default function DocumentsPage() {
                   </h1>
                   <p className="text-sm text-emerald-700/70 mt-1">{totalCount} {totalCount === 1 ? 'document' : 'documents'} total across {TIERS.length} tiers</p>
                 </div>
-
                 <div className="flex items-center gap-3 shrink-0">
                   {canDeleteActiveFolder && (
                     <button type="button" onClick={() => { if (!activeSubfolderData) return; setDeletingFolder({ tierId: current!.tierId, folderSlug: activeSubfolderData.name, folderLabel: activeSubfolderData.label }) }} className="flex items-center gap-2 px-3 py-2 bg-white border border-rose-200 hover:bg-rose-50 hover:border-rose-400 text-rose-700 text-sm font-medium rounded-lg transition shadow-sm">
@@ -911,7 +776,6 @@ export default function DocumentsPage() {
                   </div>
                 </div>
               </div>
-
               <div className="flex gap-1.5">
                 {tieredDocuments.map((t) => (
                   <div key={t.tierId} className={`h-1 flex-1 rounded-full transition-all ${t.tierId === activeTierId ? 'bg-emerald-600' : t.allDocuments.length > 0 ? 'bg-emerald-300' : 'bg-emerald-100'}`} />
@@ -945,9 +809,7 @@ export default function DocumentsPage() {
                             <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 truncate max-w-full">
                               <FolderIcon className="w-2.5 h-2.5 shrink-0" />{sfLabel}
                             </span>
-                          ) : (
-                            <span className="text-[10px] text-emerald-400/60 italic">Root</span>
-                          )}
+                          ) : <span className="text-[10px] text-emerald-400/60 italic">Root</span>}
                         </div>
                       )}
                       <div className="col-span-2 text-sm text-emerald-800/80 tabular-nums">{formatSize(doc.metadata?.size || 0)}</div>
