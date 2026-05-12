@@ -176,9 +176,14 @@ export default function DocumentsPage() {
   const [shareLoading, setShareLoading] = useState(false)
   const [selectedShareFolder, setSelectedShareFolder] = useState('')
   const [selectedShareDoc, setSelectedShareDoc] = useState('')
+const [manageData, setManageData] = useState<{
+  pageAccess: { id: string; email: string; permission: string }[]
+  folderAccess: { id: string; email: string; folder_path: string; permission: string }[]
+}>({ pageAccess: [], folderAccess: [] })
+const [manageLoading, setManageLoading] = useState(false)
 
-  const router = useRouter()
-  const loadingCanvasRef = useRef<HTMLCanvasElement>(null)
+const router = useRouter()
+const loadingCanvasRef = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => { init() }, [])
 
@@ -389,7 +394,29 @@ export default function DocumentsPage() {
   }
 
   const handleSignOut = async () => { await supabase.auth.signOut(); router.push('/') }
+const loadManageData = async () => {
+  setManageLoading(true)
+  const { data: pageRows } = await supabase.from('page_access').select('id, user_id, permission').eq('page', '/documents').not('user_id', 'is', null)
+  const { data: folderRows } = await supabase.from('folder_access').select('id, user_id, folder_path, permission')
+  const userIds = [...new Set([...(pageRows || []).map(r => r.user_id), ...(folderRows || []).map(r => r.user_id)])].filter(Boolean)
+  const { data: profiles } = await supabase.from('profiles').select('id, email').in('id', userIds)
+  const emailMap = new Map((profiles || []).map(p => [p.id, p.email]))
+  setManageData({
+    pageAccess: (pageRows || []).map(r => ({ id: r.id, email: emailMap.get(r.user_id) || r.user_id, permission: r.permission })),
+    folderAccess: (folderRows || []).map(r => ({ id: r.id, email: emailMap.get(r.user_id) || r.user_id, folder_path: r.folder_path, permission: r.permission })),
+  })
+  setManageLoading(false)
+}
 
+const handleRevokePageAccess = async (id: string) => {
+  await supabase.from('page_access').delete().eq('id', id)
+  await loadManageData()
+}
+
+const handleRevokeFolderAccess = async (id: string) => {
+  await supabase.from('folder_access').delete().eq('id', id)
+  await loadManageData()
+}
   const formatSize = (b: number) => b < 1024 ? b + ' B' : b < 1_048_576 ? (b / 1024).toFixed(1) + ' KB' : (b / 1_048_576).toFixed(1) + ' MB'
   const formatDate = (d: string | null) => d ? new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—'
   const getTypeLabel = (name: string) => {
